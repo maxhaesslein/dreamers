@@ -21,6 +21,7 @@ print('The Dreamers v.4')
 
 import numpy as np
 import cv2
+import time
 
 
 options = {
@@ -28,14 +29,20 @@ options = {
     'screenWidth': 720,
     'screenHeight': 720,
 
+    'fps': 30,
+
     'blankLoadingScreen': False,
 
     'windowName': 'The Dreamers',
 
+    'debugFPS': True,
+
 }
 
 
+
 print(options)
+
 
 
 # display startup image
@@ -60,10 +67,63 @@ if not options['blankLoadingScreen']:
     cv2.putText(startup_image, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
 
 cv2.imshow(options['windowName'], startup_image)
-key = cv2.waitKey(60)
+cv2.waitKey(60)
 
-print(key)
+
+
+target_time = current_time = time.time()
+previous_time = time.time()+1
+loop_delta = 1./options['fps']
+
+videoIn = cv2.VideoCapture('footage/stripper_dance_of_desire.mp4-52.mp4')
+
+debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
+
+while True:
+
+    start_time = time.time()
+
+    ret, frame = videoIn.read()
+
+    if ret == False:
+        print('no more frames')
+        continue
+
+    im = frame
+
+    if options['debugFPS']:
+        color = (0,255,0)
+        fps = int(1./(current_time-previous_time))
+        if fps >= 27 or fps <= 33:
+            fps = 30
+
+        if fps < 20:
+            color = (255,0,0)
+        elif fps < 30:
+            color = (255,255,0)
+
+        cv2.putText( im, str(fps), (10,20), debugFont, 1, color, 1, cv2.LINE_AA )
+
+
+    cv2.imshow(options['windowName'], im)
+
+
+    previous_time, current_time = current_time, time.time()
+    target_time += loop_delta
+    sleep_time = int((target_time - current_time)*1000)
+    if sleep_time < 1:
+        sleep_time = 1
+
+    print('fps: '+str(fps)+' / sleep_time: '+str(sleep_time))
+
+    key = cv2.waitKey(sleep_time)
+
+    if key == 27: # escape
+        break
 
 
 print('bye!')
+
+videoIn.release()
+cv2.destroyAllWindows()
 
