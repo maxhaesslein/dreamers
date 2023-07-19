@@ -45,6 +45,13 @@ print(options)
 
 
 
+# setup window
+cv2.namedWindow( options['windowName'], cv2.WINDOW_NORMAL )
+cv2.resizeWindow( options['windowName'], options['screenWidth'], options['screenHeight'] )
+cv2.setWindowProperty( options['windowName'], cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN )
+
+
+
 # display startup image
 startup_image = np.zeros((options['screenWidth'], options['screenHeight'], 3), np.uint8)
 if not options['blankLoadingScreen']:
@@ -89,7 +96,20 @@ while True:
         print('no more frames')
         continue
 
-    im = frame
+    # resize frame
+    frameHeight, frameWidth, frameChannels = frame.shape
+    targetWidth = options['screenWidth']
+    targetHeight = int(targetWidth * frameHeight/frameWidth)
+    if targetHeight < options['screenHeight']:
+        targetHeight = options['screenHeight']
+        targetWidth = int(targetHeight * frameWidth/frameHeight)
+
+    marginX = int((targetWidth - options['screenWidth'])/2)
+    marginY = int((targetHeight - options['screenHeight'])/2)
+
+    im = cv2.resize( frame, (targetWidth, targetHeight) )
+
+    im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
 
     if options['debugFPS']:
         color = (0,255,0)
@@ -113,8 +133,6 @@ while True:
     sleep_time = int((target_time - current_time)*1000)
     if sleep_time < 1:
         sleep_time = 1
-
-    print('fps: '+str(fps)+' / sleep_time: '+str(sleep_time))
 
     key = cv2.waitKey(sleep_time)
 
