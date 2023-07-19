@@ -1,0 +1,69 @@
+#!/usr/bin/python
+
+
+# The Dreamers v4, 2023
+# by maxhaesslein, 2014-2023
+# www.maxhaesslein.de
+
+
+# dependencies: opencv
+# sudo apt install python3-opencv
+# sudo apt install xserver-xorg xinit
+#
+# start with:
+# startx /home/mh/dreamers/dreamers
+
+# autostart happens in ~/.config/systemd/user/dreamers.service
+
+
+print('The Dreamers v.4')
+
+
+import numpy as np
+import cv2
+
+
+options = {
+
+    'screenWidth': 720,
+    'screenHeight': 720,
+
+    'blankLoadingScreen': False,
+
+    'windowName': 'The Dreamers',
+
+}
+
+
+print(options)
+
+
+# display startup image
+startup_image = np.zeros((options['screenWidth'], options['screenHeight'], 3), np.uint8)
+if not options['blankLoadingScreen']:
+
+    font = cv2.FONT_HERSHEY_TRIPLEX # TODO: use custom font
+    text = "The Dreamers"
+    fontsize = 2
+    fontwidth = 3
+    textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
+    textX = int((options['screenWidth'] - textsize[0]) / 2)
+    textY = int((options['screenHeight'] - textsize[1]) / 2)
+    cv2.putText(startup_image, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
+
+    text = "loading ...".upper()
+    fontsize = 1
+    fontwidth = 1
+    textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
+    textX = int((options['screenWidth'] - textsize[0]) / 2)
+    textY = int((options['screenHeight'] - textsize[1]))
+    cv2.putText(startup_image, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
+
+cv2.imshow(options['windowName'], startup_image)
+key = cv2.waitKey(60)
+
+print(key)
+
+
+print('bye!')
+
