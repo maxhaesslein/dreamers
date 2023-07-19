@@ -22,6 +22,8 @@ print('The Dreamers v.4')
 import numpy as np
 import cv2
 import time
+import os
+import random
 
 
 options = {
@@ -37,11 +39,17 @@ options = {
 
     'debugFPS': True,
 
+    'videoExtension': 'mp4',
+    'videoPath': 'footage/',
+
+    'verbose': True,
+
 }
 
 
-
-print(options)
+if options['verbose']:
+    print('-- options --')
+    print(options)
 
 
 
@@ -78,13 +86,36 @@ cv2.waitKey(60)
 
 
 
+# find videos:
+videoFiles = [f for f in os.listdir(options['videoPath']) if os.path.isfile(os.path.join(options['videoPath'], f)) and f.lower().endswith(options['videoExtension'])]
+if options['verbose']:
+    print('-- video files --')
+    print(videoFiles)
+
+
 target_time = current_time = time.time()
 previous_time = time.time()+1
 loop_delta = 1./options['fps']
 
-videoIn = cv2.VideoCapture('footage/stripper_dance_of_desire.mp4-52.mp4')
+def getNewVideoIn():
+
+    videoFile = random.choice(videoFiles)
+    videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
+
+    maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
+    if maxFrameCount > 100:
+        startFrame = random.randint(0, maxFrameCount-100)
+        videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
+
+    return videoIn
+
+
+videoIn = getNewVideoIn()
+
 
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
+
+fps = 0
 
 # main loop
 while True:
@@ -116,11 +147,10 @@ while True:
 
     if options['debugFPS']:
         color = (0,255,0)
-        fps = int(1./(current_time-previous_time))
-        if fps >= 27 or fps <= 33:
+        if fps >= 29 or fps <= 31:
             fps = 30
 
-        if fps < 20:
+        if fps < 25:
             color = (255,0,0)
         elif fps < 30:
             color = (255,255,0)
@@ -132,6 +162,7 @@ while True:
 
 
     previous_time, current_time = current_time, time.time()
+    fps = int(1./(current_time-previous_time))
     target_time += loop_delta
     sleep_time = int((target_time - current_time)*1000)
     if sleep_time < 1:
@@ -141,6 +172,9 @@ while True:
 
     if key == 27: # escape
         break
+
+    elif key == 32: # space
+        videoIn = getNewVideoIn()
 
 
 print('bye!')
