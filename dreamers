@@ -16,7 +16,26 @@
 # autostart happens in ~/.config/systemd/user/dreamers.service
 
 
-print('The Dreamers v.4')
+print("")
+print("###############################")
+print("")
+print("    THE DREAMERS v.4")
+print("")
+#print("    q: quit and shutdown")
+#print("    e: exit to console")
+print("    esc: exit")
+print("  space: fake onset")
+#print("    ,: decrease sensitivity")
+#print("    .: increase sensitivity")
+#print("    n: decrease speed")
+#print("    m: increase speed")
+#print("    s: sharpening overlay")
+#print("    w: soundstream overlay")
+#print("    p: pause rendering")
+#print("    d: debug screen level")
+#print("    v: verbose level")
+print("")
+print("###############################")
 
 
 import numpy as np
@@ -27,6 +46,8 @@ import random
 
 
 options = {
+
+    'videostreamCount': 4,
 
     'screenWidth': 720,
     'screenHeight': 720,
@@ -122,7 +143,14 @@ def drawDebugRect( im, x, y, w, h, p, c ):
 
 
 
-videoIn = getNewVideoIn()
+
+videostreams = []
+for i in range(options['videostreamCount']):
+    videostreams.append( getNewVideoIn() )
+
+
+videostreamIndex = 0
+videoIn = videostreams[videostreamIndex]
 
 
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
@@ -210,11 +238,22 @@ while True:
 
     key = cv2.waitKey(sleep_time)
 
+    onset = False
+
     if key == 27: # escape
         break
 
     elif key == 32: # space
-        videoIn = getNewVideoIn()
+        onset = True
+
+
+    if onset:
+        prevVideostreamIndex = videostreamIndex
+        videostreamIndex += 1
+        if videostreamIndex >= len(videostreams):
+            videostreamIndex = 0
+        videoIn = videostreams[videostreamIndex]
+        videostreams[prevVideostreamIndex] = getNewVideoIn()
 
 
 print('bye!')
