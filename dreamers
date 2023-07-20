@@ -33,7 +33,7 @@ print("      5: toggle effect 'sharpening'")
 print("      6: toggle effect 'emboss'")
 print("      7: toggle effect 'inverse'")
 print("      8: toggle effect 'multiple'")
-print("      0: toggle all effects'")
+print("      0: toggle all effects")
 #print("    ,: decrease sensitivity")
 #print("    .: increase sensitivity")
 #print("    n: decrease speed")
@@ -252,12 +252,12 @@ class VideostreamProcessor():
         self.streams[randomIndex] = self.loadVideo()
 
 
-    def getNextFrame(self):
+    def getNextFrame(self, blocking = False):
 
         if not self.running:
             return false
 
-        frame = self.streams[self.index]['queue'].get()
+        frame = self.streams[self.index]['queue'].get(blocking)
 
         return frame
 
@@ -273,6 +273,10 @@ class VideostreamProcessor():
 class EffectProcessor():
 
     def __init__(self):
+
+        self.queueInput = Queue(maxsize=1)
+        self.queueOutput = Queue(maxsize=1)
+        self.running = True
 
         self.kernels = {
             'edgeDetection': np.array([ [-1,-1,-1], [-1, 8,-1], [-1,-1,-1] ]),
@@ -312,6 +316,30 @@ class EffectProcessor():
         self.luts = {
             'inverse': inverseLut[::-1]
         }
+
+
+    def start(self):
+        t = Thread(target=self.update, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+
+    def update(self):
+        while self.running:
+            frame = self.queueInput.get(True)
+
+            frame = self.apply(frame)
+
+            self.queueOutput.put(frame)
+
+
+    def put(self, frame):
+        self.queueInput.put(frame)
+
+
+    def get(self):
+        return self.queueOutput.get()
 
 
     def apply(self, frame):
@@ -470,23 +498,37 @@ class EffectProcessor():
         return self.active, self.options
 
 
+    def stop(self):
+        self.running = False
+
+
 
 fps = 0
-target_time = current_time = time.time()
-previous_time = time.time()+1
-loop_delta = 1./options['fps']
+targetTime = 1./options['fps']
+previousTime = currentTime = time.time()
 sleep_time = 0
 
 videostreams = VideostreamProcessor().start()
-effects = EffectProcessor()
+effects = EffectProcessor().start()
 
+lastFrame = videostreams.getNextFrame(True)
+effects.put(lastFrame)
+
+time.sleep(1)
 
 # main loop
 while True:
 
-    start_time = time.time()
+    startTime = time.time()
 
-    frame = videostreams.getNextFrame()
+    nextFrame = videostreams.getNextFrame()
+    if type(nextFrame) == type(None): # no frame retreived, use last frame
+        nextFrame = lastFrame
+
+    lastFrame = nextFrame
+
+    frame = effects.get()
+    effects.put(nextFrame)
 
     # resize frame
     frameHeight, frameWidth, frameChannels = frame.shape
@@ -503,23 +545,19 @@ while True:
 
     im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
 
-    im = effects.apply(im)
-
     if options['debugFPS']:
         color = (0,255,0)
-        if fps >= 29 or fps <= 31:
-            fps = 30
 
         if fps < 25:
             color = (255,0,0)
         elif fps < 30:
             color = (255,255,0)
 
-        cv2.putText( im, str(fps), (10,options['screenWidth']-80), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, str(fps), (options['screenWidth']-30, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
     if options['debugTiming']:
 
-        maxTime = int(loop_delta*1000)
+        maxTime = int(targetTime*1000)
 
         color = (0,255,0)
         if sleep_time < maxTime * 0.2:
@@ -617,10 +655,12 @@ while True:
     cv2.imshow(options['windowName'], im)
 
 
-    previous_time, current_time = current_time, time.time()
-    fps = int(1./(current_time-previous_time))
-    target_time += loop_delta
-    sleep_time = int((target_time - current_time)*1000)
+    previousTime, currentTime = currentTime, time.time()
+    usedTime = currentTime - startTime
+    timeLeft = targetTime-usedTime
+    fps = int(1./(currentTime-previousTime))
+    sleep_time = int((timeLeft)*1000)
+    print(sleep_time)
     if sleep_time < 1:
         sleep_time = 1
 
@@ -672,6 +712,8 @@ while True:
 
 print('bye!')
 
+effects.stop()
 videostreams.stop()
+
 cv2.destroyAllWindows()
 
