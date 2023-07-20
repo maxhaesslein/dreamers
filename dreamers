@@ -38,6 +38,7 @@ options = {
     'windowName': 'The Dreamers',
 
     'debugFPS': True,
+    'debugTiming': True,
 
     'videoExtension': 'mp4',
     'videoPath': 'footage/',
@@ -93,10 +94,6 @@ if options['verbose']:
     print(videoFiles)
 
 
-target_time = current_time = time.time()
-previous_time = time.time()+1
-loop_delta = 1./options['fps']
-
 def getNewVideoIn():
 
     videoFile = random.choice(videoFiles)
@@ -116,6 +113,11 @@ videoIn = getNewVideoIn()
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
 
 fps = 0
+target_time = current_time = time.time()
+previous_time = time.time()+1
+loop_delta = 1./options['fps']
+sleep_time = 0
+
 
 # main loop
 while True:
@@ -156,6 +158,33 @@ while True:
             color = (255,255,0)
 
         cv2.putText( im, str(fps), (10,20), debugFont, 1, color, 1, cv2.LINE_AA )
+
+    if options['debugTiming']:
+
+        width = 30
+        height = 100
+
+        lineWidth = 1
+
+        x = options['screenWidth'] - width - 10
+        y = options['screenHeight'] - height - 10
+
+        maxTime = int(loop_delta*1000)
+        usedTime = maxTime-sleep_time
+
+        filledHeight = int(float(height)/float(maxTime)*float(usedTime))
+
+        if filledHeight > height:
+            filledHeight = height
+
+        color = (0,255,0)
+        if usedTime > maxTime * 0.8:
+            color = (0,0,255)
+        elif usedTime > maxTime*0.6:
+            color = (0,255,255)
+
+        cv2.rectangle( im, (x,y), (x+width, y+height), color, lineWidth )
+        cv2.rectangle( im, (x,y-3+height-filledHeight), (x+width, y+height), color, -1 )
 
 
     cv2.imshow(options['windowName'], im)
