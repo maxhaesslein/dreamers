@@ -38,8 +38,9 @@ print("")
 print("###############################")
 
 
-import numpy as np
 from queue import Queue
+from threading import Thread
+import numpy as np
 import cv2
 import time
 import os
@@ -48,8 +49,10 @@ import random
 
 options = {
 
-    'videostreamCount': 4,
-    'videostreamMaxQueueSize': 10,
+    'videostreamCount': 32,
+    'videostreamMaxQueueSize': 20,
+
+    'videoProcessorTimeout': 0.05,
 
     'screenWidth': 720,
     'screenHeight': 720,
@@ -139,6 +142,8 @@ class VideostreamProcessor():
 
     def __init__(self):
 
+        self.running = True
+
         self.streams = []
         self.index = 0
 
@@ -146,20 +151,27 @@ class VideostreamProcessor():
             self.streams.append( self.loadVideo() )
 
 
+    def start(self):
+        t = Thread(target=self.update, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+
     def loadVideo(self):
 
         videoFile = random.choice(videoFiles)
         videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
 
-        maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
-        if maxFrameCount > 100:
-            startFrame = random.randint(0, maxFrameCount-100)
-            videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
+        # we currently start always at the beginning of the video; seeking may add framedrops
+        #maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
+        #if maxFrameCount > 100:
+        #    startFrame = random.randint(0, maxFrameCount-100)
+        #    videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
 
         stream = {
             'queue': Queue(maxsize=options['videostreamMaxQueueSize']),
             'videoIn': videoIn,
-            'videoFile': videoFile, # DEBUG
         }
 
         return stream
@@ -167,9 +179,24 @@ class VideostreamProcessor():
 
     def update(self):
 
+        while self.running:
+
+            # first, fill up current stream
+            currentStream = self.streams[self.index]
+            while not currentStream['queue'].full():
+                self.readFrameToQueue(currentStream)
+
+            # then fill up rest:
+            for stream in self.streams:
+                self.readFrameToQueue(stream)
+
+            time.sleep(options['videoProcessorTimeout'])
+
+
+    def stop(self):
+        self.running = False
         for stream in self.streams:
-            #print('update #'+str(i)+' in stream '+str(stream['videoFile'])+' / Queue: '+str(stream['queue'].qsize())+' frames' )
-            self.readFrameToQueue(stream)
+            stream['videoIn'].release()
 
 
     def readFrameToQueue(self, stream):
@@ -183,7 +210,6 @@ class VideostreamProcessor():
         if ret == False:
             # no more frames left, loop video
             stream['videoIn'].set(cv2.CAP_PROP_POS_FRAMES, 0)
-            self.readFrameToQueue(stream) # re-run
             return
 
         stream['queue'].put(frame)
@@ -209,8 +235,10 @@ class VideostreamProcessor():
         self.streams[randomIndex] = self.loadVideo()
 
 
-
     def getNextFrame(self):
+
+        if not self.running:
+            return false
 
         frame = self.streams[self.index]['queue'].get()
 
@@ -224,10 +252,6 @@ class VideostreamProcessor():
 
         return self.index, infos
 
-    def release(self):
-        for stream in self.streams:
-            stream['videoIn'].release()
-
 
 
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
@@ -238,16 +262,13 @@ previous_time = time.time()+1
 loop_delta = 1./options['fps']
 sleep_time = 0
 
-videostreams = VideostreamProcessor()
-videostreams.update()
+videostreams = VideostreamProcessor().start()
 
 
 # main loop
 while True:
 
     start_time = time.time()
-
-    videostreams.update()
 
     frame = videostreams.getNextFrame()
 
@@ -339,6 +360,12 @@ while True:
     elif key == 32: # space
         onset = True
 
+    elif key&0xFF == ord('i'):
+        videostreams.changeVideostreamIndex()
+
+    elif key&0xFF == ord('c'):
+        videostreams.changeVideostreamInput()
+
 
     if onset:
         if random.randint(0,1) == 1:
@@ -349,6 +376,6 @@ while True:
 
 print('bye!')
 
-videostreams.release()
+videostreams.stop()
 cv2.destroyAllWindows()
 
