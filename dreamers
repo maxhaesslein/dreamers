@@ -25,6 +25,15 @@ print("")
 #print("    e: exit to console")
 print("    esc: exit")
 print("  space: fake onset")
+print("      1: toggle effect 'colorMap'")
+print("      2: toggle effect 'blur'")
+print("      3: toggle effect 'edgeDetection'")
+print("      4: toggle effect 'flip'")
+print("      5: toggle effect 'sharpening'")
+print("      6: toggle effect 'emboss'")
+print("      7: toggle effect 'inverse'")
+print("      8: toggle effect 'multiple'")
+print("      0: toggle all effects'")
 #print("    ,: decrease sensitivity")
 #print("    .: increase sensitivity")
 #print("    n: decrease speed")
@@ -49,29 +58,31 @@ import random
 
 options = {
 
+    'debugFPS': True,
+    'debugTiming': True,
+    'debugStreams': True,
+    'debugEffects': True,
+
+    'verbose': True,
+
+    'fps': 30,
+
+    'screenWidth': 720,
+    'screenHeight': 720,
+
+
     'videostreamCount': 32,
     'videostreamMaxQueueSize': 20,
 
     'videoProcessorTimeout': 0.05,
 
-    'screenWidth': 720,
-    'screenHeight': 720,
-
-    'fps': 30,
-
-    'blankLoadingScreen': False,
 
     'windowName': 'The Dreamers',
-
-    'debugFPS': True,
-    'debugTiming': True,
-    'debugStreams': True,
 
     'videoExtension': 'mp4',
     'videoPath': 'footage/',
 
-    'verbose': True,
-
+    'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 }
 
 
@@ -90,25 +101,21 @@ cv2.setWindowProperty( options['windowName'], cv2.WND_PROP_FULLSCREEN, cv2.WINDO
 
 # display startup image
 startup_image = np.zeros((options['screenWidth'], options['screenHeight'], 3), np.uint8)
-if not options['blankLoadingScreen']:
-
-    font = cv2.FONT_HERSHEY_TRIPLEX # TODO: use custom font
-    text = "The Dreamers"
-    fontsize = 2
-    fontwidth = 3
-    textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
-    textX = int((options['screenWidth'] - textsize[0]) / 2)
-    textY = int((options['screenHeight'] - textsize[1]) / 2)
-    cv2.putText(startup_image, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
-
-    text = "loading ...".upper()
-    fontsize = 1
-    fontwidth = 1
-    textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
-    textX = int((options['screenWidth'] - textsize[0]) / 2)
-    textY = int((options['screenHeight'] - textsize[1]))
-    cv2.putText(startup_image, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
-
+font = cv2.FONT_HERSHEY_TRIPLEX # TODO: use custom font
+text = "The Dreamers"
+fontsize = 2
+fontwidth = 3
+textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
+textX = int((options['screenWidth'] - textsize[0]) / 2)
+textY = int((options['screenHeight'] - textsize[1]) / 2)
+cv2.putText(startup_image, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
+text = "loading ...".upper()
+fontsize = 1
+fontwidth = 1
+textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
+textX = int((options['screenWidth'] - textsize[0]) / 2)
+textY = int((options['screenHeight'] - textsize[1]))
+cv2.putText(startup_image, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
 cv2.imshow(options['windowName'], startup_image)
 cv2.waitKey(60)
 
@@ -253,6 +260,85 @@ class VideostreamProcessor():
         return self.index, infos
 
 
+class EffectProcessor():
+
+    def __init__(self):
+
+        self.kernels = {
+            'edgedetection': np.array([ [-1,-1,-1], [-1, 8,-1], [-1,-1,-1] ]),
+            'sharpening':    np.array([ [ 1,-3, 1], [-1, 9,-1], [-1,-3,-1] ]),
+            'emboss':    np.array([ [-3, -3,-3], [-4,-4,-4], [ 7, 8, 7] ])
+        }
+
+        self.options = {
+            'colorMap': 0,
+            'blur': [0,0],
+            'edgeDetection': 0,
+            'flip': 0,
+            'sharpening': 0,
+            'emboss': 0,
+            'inverse': 0,
+            'multiple': 0,
+        }
+
+        self.active = {
+            'colorMap': True,
+            'blur': True,
+            'edgeDetection': True,
+            'flip': True,
+            'sharpening': True,
+            'emboss': True,
+            'inverse': True,
+            'multiple': True,
+        }
+
+        self.colorMaps = []
+        for colorMap in options['colorMaps']:
+            self.colorMaps.append(getattr(cv2, "COLORMAP_"+colorMap))
+
+        gamma = 1.0 # 0.0 - 1.0 --> different gamma values
+        invGamma = 1.0 / gamma
+        inverseLut = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        self.luts = {
+            'inverse': inverseLut[::-1]
+        }
+
+
+    def apply(self, frame):
+
+
+        return frame
+
+
+    def toggle(self, effect, setToBool = 'none' ):
+
+        if effect == 'all':
+            setToBool = not self.active['colorMap'] # we use the value of the first effect to toggle
+            for effect in self.active:
+                self.toggle(effect, setToBool)
+            return
+
+        print('setToBool '+str(setToBool))
+
+        if setToBool is 'none':
+            # toggle
+            self.active[effect] = not self.active[effect]
+        else:
+            # set to value
+            self.active[effect] = setToBool
+
+        if effect == 'blur':
+            self.options[effect] = [0,0]
+        else:
+            self.options[effect] = 0
+
+        if options['verbose']:
+            print('set effect '+str(effect)+' to '+str(self.active[effect]))
+
+
+    def getInfo(self):
+        return self.active, self.options
+
 
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
 
@@ -263,6 +349,7 @@ loop_delta = 1./options['fps']
 sleep_time = 0
 
 videostreams = VideostreamProcessor().start()
+effects = EffectProcessor()
 
 
 # main loop
@@ -286,6 +373,8 @@ while True:
     im = cv2.resize( frame, (targetWidth, targetHeight) )
 
     im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
+
+    im = effects.apply(im)
 
     if options['debugFPS']:
         color = (0,255,0)
@@ -330,12 +419,32 @@ while True:
         x = 10
         y = options['screenHeight'] - h - 10
 
-
         for i, queueSize in enumerate(queueSizes):
             color = (0,255,0)
             if i == streamIndex:
                 color = (0,0,255)
             filledPercent = float(queueSize/options['videostreamMaxQueueSize'])
+            drawDebugRect( im, x, y, w, h, filledPercent, color )
+            x += w+5
+
+    if options['debugEffects']:
+        activeEffects, effectOptions = effects.getInfo()
+
+        w = 10
+        h = 50
+        x = 80
+        y = 10
+
+        for activeEffect in activeEffects:
+
+            filledPercent = 0
+            color = (0,0,0)
+
+            if activeEffects[activeEffect]:
+                color = (0,255,0)
+                value = effectOptions[activeEffect] # TODO
+                filledPercent = 1
+
             drawDebugRect( im, x, y, w, h, filledPercent, color )
             x += w+5
 
@@ -366,8 +475,27 @@ while True:
     elif key&0xFF == ord('c'):
         videostreams.changeVideostreamInput()
 
+    elif key&0xFF == ord('0'):
+        effects.toggle('all')
+    elif key&0xFF == ord('1'):
+        effects.toggle('colorMap')
+    elif key&0xFF == ord('2'):
+        effects.toggle('blur')
+    elif key&0xFF == ord('3'):
+        effects.toggle('edgeDetection')
+    elif key&0xFF == ord('4'):
+        effects.toggle('flip')
+    elif key&0xFF == ord('5'):
+        effects.toggle('sharpening')
+    elif key&0xFF == ord('6'):
+        effects.toggle('emboss')
+    elif key&0xFF == ord('7'):
+        effects.toggle('inverse')
+    elif key&0xFF == ord('8'):
+        effects.toggle('multiple')
 
     if onset:
+        # TODO: maybe change effects
         if random.randint(0,1) == 1:
             videostreams.changeVideostreamIndex()
         else:
