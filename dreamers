@@ -39,6 +39,7 @@ print("###############################")
 
 
 import numpy as np
+from queue import Queue
 import cv2
 import time
 import os
@@ -48,6 +49,7 @@ import random
 options = {
 
     'videostreamCount': 4,
+    'videostreamMaxQueueSize': 10,
 
     'screenWidth': 720,
     'screenHeight': 720,
@@ -60,6 +62,7 @@ options = {
 
     'debugFPS': True,
     'debugTiming': True,
+    'debugStreams': True,
 
     'videoExtension': 'mp4',
     'videoPath': 'footage/',
@@ -112,20 +115,9 @@ cv2.waitKey(60)
 videoFiles = [f for f in os.listdir(options['videoPath']) if os.path.isfile(os.path.join(options['videoPath'], f)) and f.lower().endswith(options['videoExtension'])]
 if options['verbose']:
     print('-- video files --')
-    print(videoFiles)
+    print(str(len(videoFiles))+' videofiles')
+    #print(videoFiles)
 
-
-def getNewVideoIn():
-
-    videoFile = random.choice(videoFiles)
-    videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
-
-    maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
-    if maxFrameCount > 100:
-        startFrame = random.randint(0, maxFrameCount-100)
-        videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
-
-    return videoIn
 
 
 
@@ -143,14 +135,88 @@ def drawDebugRect( im, x, y, w, h, p, c ):
 
 
 
+class VideostreamProcessor():
 
-videostreams = []
-for i in range(options['videostreamCount']):
-    videostreams.append( getNewVideoIn() )
+    def __init__(self):
+
+        self.streams = []
+        self.index = 0
+
+        for i in range(options['videostreamCount']):
+            self.streams.append( self.loadVideo() )
 
 
-videostreamIndex = 0
-videoIn = videostreams[videostreamIndex]
+    def loadVideo(self):
+
+        videoFile = random.choice(videoFiles)
+        videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
+
+        maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
+        if maxFrameCount > 100:
+            startFrame = random.randint(0, maxFrameCount-100)
+            videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
+
+        stream = {
+            'queue': Queue(maxsize=options['videostreamMaxQueueSize']),
+            'videoIn': videoIn,
+            'videoFile': videoFile, # DEBUG
+        }
+
+        return stream
+
+
+    def update(self):
+
+        for stream in self.streams:
+            for i in range(2):
+                #print('update #'+str(i)+' in stream '+str(stream['videoFile'])+' / Queue: '+str(stream['queue'].qsize())+' frames' )
+                self.readFrameToQueue(stream)
+
+
+    def readFrameToQueue(self, stream):
+
+        if stream['queue'].full():
+            #print('queue already full')
+            return
+
+        ret, frame = stream['videoIn'].read()
+
+        if ret == False:
+            # no more frames left, loop video
+            stream['videoIn'].set(cv2.CAP_PROP_POS_FRAMES, 0)
+            self.readFrameToQueue(self, stream) # re-run
+            return
+
+        stream['queue'].put(frame)
+
+
+    def changeVideostreamIndex(self):
+
+        # TODO: change to random stream, choose stream with at least half a buffer worth of images
+
+        self.index += 1
+        if self.index >= len(self.streams):
+            self.index = 0
+
+
+    def getNextFrame(self):
+
+        frame = self.streams[self.index]['queue'].get()
+
+        return frame
+
+    def getInfo(self):
+
+        infos = []
+        for stream in self.streams:
+            infos.append(stream['queue'].qsize())
+
+        return self.index, infos
+
+    def release(self):
+        for stream in self.streams:
+            stream['videoIn'].release()
+
 
 
 debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
@@ -161,19 +227,18 @@ previous_time = time.time()+1
 loop_delta = 1./options['fps']
 sleep_time = 0
 
+videostreams = VideostreamProcessor()
+videostreams.update()
+
 
 # main loop
 while True:
 
     start_time = time.time()
 
-    ret, frame = videoIn.read()
+    videostreams.update()
 
-    if ret == False:
-        # loop video:
-        videoIn.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        continue
-
+    frame = videostreams.getNextFrame()
 
     # resize frame
     frameHeight, frameWidth, frameChannels = frame.shape
@@ -225,6 +290,23 @@ while True:
 
         drawDebugRect( im, x, y, w, h, filledPercent, color )
 
+    if options['debugStreams']:
+        streamIndex, queueSizes = videostreams.getInfo()
+
+        w = 10
+        h = 100
+        x = 10
+        y = options['screenHeight'] - h - 10
+
+
+        for i, queueSize in enumerate(queueSizes):
+            color = (0,255,0)
+            if i == streamIndex:
+                color = (0,0,255)
+            filledPercent = float(queueSize/options['videostreamMaxQueueSize'])
+            drawDebugRect( im, x, y, w, h, filledPercent, color )
+            x += w+5
+
 
     cv2.imshow(options['windowName'], im)
 
@@ -248,16 +330,12 @@ while True:
 
 
     if onset:
-        prevVideostreamIndex = videostreamIndex
-        videostreamIndex += 1
-        if videostreamIndex >= len(videostreams):
-            videostreamIndex = 0
-        videoIn = videostreams[videostreamIndex]
-        videostreams[prevVideostreamIndex] = getNewVideoIn()
+        # TODO: maybe change videostream, maybe change videofile in another slot
+        videostreams.changeVideostreamIndex()
 
 
 print('bye!')
 
-videoIn.release()
+videostreams.release()
 cv2.destroyAllWindows()
 
