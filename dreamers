@@ -107,6 +107,21 @@ def getNewVideoIn():
     return videoIn
 
 
+
+def drawDebugRect( im, x, y, w, h, p, c ):
+
+    lineWidth = 1
+
+    if p > 1.0:
+        p = 1.0
+
+    filledHeight = int(h * p)
+
+    cv2.rectangle( im, (x,y), (x+w, y+h), c, lineWidth )
+    cv2.rectangle( im, (x,y+h-filledHeight), (x+w, y+h), c, -1 )
+
+
+
 videoIn = getNewVideoIn()
 
 
@@ -161,30 +176,26 @@ while True:
 
     if options['debugTiming']:
 
-        width = 30
-        height = 100
-
-        lineWidth = 1
-
-        x = options['screenWidth'] - width - 10
-        y = options['screenHeight'] - height - 10
-
         maxTime = int(loop_delta*1000)
-        usedTime = maxTime-sleep_time
-
-        filledHeight = int(float(height)/float(maxTime)*float(usedTime))
-
-        if filledHeight > height:
-            filledHeight = height
 
         color = (0,255,0)
-        if usedTime > maxTime * 0.8:
+        if sleep_time < maxTime * 0.2:
             color = (0,0,255)
-        elif usedTime > maxTime*0.6:
+        elif sleep_time < maxTime*0.4:
             color = (0,255,255)
 
-        cv2.rectangle( im, (x,y), (x+width, y+height), color, lineWidth )
-        cv2.rectangle( im, (x,y-3+height-filledHeight), (x+width, y+height), color, -1 )
+        freePercent = (float(sleep_time)/float(maxTime))
+        if freePercent < 0.1:
+            freePercent = 0
+
+        filledPercent = 1-freePercent
+
+        w = 30
+        h = 100
+        x = options['screenWidth'] - w - 10
+        y = options['screenHeight'] - h - 10
+
+        drawDebugRect( im, x, y, w, h, filledPercent, color )
 
 
     cv2.imshow(options['windowName'], im)
