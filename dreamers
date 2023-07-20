@@ -168,9 +168,8 @@ class VideostreamProcessor():
     def update(self):
 
         for stream in self.streams:
-            for i in range(2):
-                #print('update #'+str(i)+' in stream '+str(stream['videoFile'])+' / Queue: '+str(stream['queue'].qsize())+' frames' )
-                self.readFrameToQueue(stream)
+            #print('update #'+str(i)+' in stream '+str(stream['videoFile'])+' / Queue: '+str(stream['queue'].qsize())+' frames' )
+            self.readFrameToQueue(stream)
 
 
     def readFrameToQueue(self, stream):
@@ -184,7 +183,7 @@ class VideostreamProcessor():
         if ret == False:
             # no more frames left, loop video
             stream['videoIn'].set(cv2.CAP_PROP_POS_FRAMES, 0)
-            self.readFrameToQueue(self, stream) # re-run
+            self.readFrameToQueue(stream) # re-run
             return
 
         stream['queue'].put(frame)
@@ -192,11 +191,23 @@ class VideostreamProcessor():
 
     def changeVideostreamIndex(self):
 
-        # TODO: change to random stream, choose stream with at least half a buffer worth of images
+        randomIndex = random.randint(0, options['videostreamCount']-1)
+        if randomIndex == self.index:
+            # don't change to current stream, just abort here
+            return
 
-        self.index += 1
-        if self.index >= len(self.streams):
-            self.index = 0
+        self.index = randomIndex
+
+
+    def changeVideostreamInput(self):
+
+        randomIndex = random.randint(0, options['videostreamCount']-1)
+        if randomIndex == self.index:
+            # don't change current stream, just abort here
+            return
+
+        self.streams[randomIndex] = self.loadVideo()
+
 
 
     def getNextFrame(self):
@@ -330,8 +341,10 @@ while True:
 
 
     if onset:
-        # TODO: maybe change videostream, maybe change videofile in another slot
-        videostreams.changeVideostreamIndex()
+        if random.randint(0,1) == 1:
+            videostreams.changeVideostreamIndex()
+        else:
+            videostreams.changeVideostreamInput()
 
 
 print('bye!')
