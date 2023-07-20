@@ -83,6 +83,16 @@ options = {
     'videoPath': 'footage/',
 
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
+
+    'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
+}
+
+
+maxVals = {
+    'blur': 30,
+    'edgeDetection': 10,
+    'sharpening': 20,
+    'emboss': 10
 }
 
 
@@ -265,7 +275,7 @@ class EffectProcessor():
     def __init__(self):
 
         self.kernels = {
-            'edgedetection': np.array([ [-1,-1,-1], [-1, 8,-1], [-1,-1,-1] ]),
+            'edgeDetection': np.array([ [-1,-1,-1], [-1, 8,-1], [-1,-1,-1] ]),
             'sharpening':    np.array([ [ 1,-3, 1], [-1, 9,-1], [-1,-3,-1] ]),
             'emboss':    np.array([ [-3, -3,-3], [-4,-4,-4], [ 7, 8, 7] ])
         }
@@ -306,8 +316,128 @@ class EffectProcessor():
 
     def apply(self, frame):
 
+        # convert to grayscale for faster effect computation
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # inverse
+        if self.active['inverse'] and self.options['inverse'] > 0:
+            frame = cv2.LUT(frame, self.luts['inverse'])
+
+        # flip
+        if self.active['flip'] and self.options['flip'] > 0:
+            frame = cv2.flip(frame, 1)
+
+        # edge detection
+        if self.active['edgeDetection'] and self.options['edgeDetection'] > 0:
+            frame = cv2.filter2D(frame, -1, self.kernels['edgeDetection'])
+            self.options['edgeDetection'] -= 1
+
+        # blur image
+        if self.active['blur'] and (self.options['blur'][0] > 1 or self.options['blur'][1] > 1):
+            frame = cv2.blur(frame, (self.options['blur'][0], self.options['blur'][1]))
+            self.options['blur'][0] -= 1
+            if self.options['blur'][0] < 1: self.options['blur'][0] = 1
+            self.options['blur'][1] -= 1
+            if self.options['blur'][1] < 1: self.options['blur'][1] = 1
+
+        # sharpening
+        if self.active['sharpening'] and self.options['sharpening'] > 0:
+            frame = cv2.filter2D(frame, -1, self.kernels['sharpening'])
+            self.options['sharpening'] -= 1
+
+        # emboss
+        if self.active['emboss'] and self.options['emboss'] > 0:
+            frame = cv2.filter2D(frame, -1, self.kernels['emboss'])
+            self.options['emboss'] -= 1
+
+        # show frame multiple times
+        if self.active['multiple'] and self.options['multiple']:
+            if self.options['multiple'] == 2:
+                frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # resize two half the size
+                frame = np.concatenate((frame, frame), axis=0) # stack vertically
+                frame = np.concatenate((frame, frame), axis=1) # stack horizontally
+            elif self.options['multiple'] == 3:
+                frame = cv2.resize(frame, (0,0), fx=0.333, fy=0.333)
+                frame = np.concatenate((frame, frame, frame), axis=0)
+                frame = np.concatenate((frame, frame, frame), axis=1)
+            elif self.options['multiple'] == 4:
+                frame = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
+                frame = np.concatenate((frame, frame, frame, frame), axis=0)
+                frame = np.concatenate((frame, frame, frame, frame), axis=1)
+            elif self.options['multiple'] == 5:
+                frame = cv2.resize(frame, (0,0), fx=0.2, fy=0.2)
+                frame = np.concatenate((frame, frame, frame, frame, frame), axis=0)
+                frame = np.concatenate((frame, frame, frame, frame, frame), axis=1)
+            elif self.options['multiple'] == 6:
+                frame = cv2.resize(frame, (0,0), fx=0.167, fy=0.167)
+                frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=0)
+                frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
+
+        # convert back to bgr
+        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+
+        # tint image
+        if self.active['colorMap'] and self.options['colorMap'] > 0:
+            frame = cv2.applyColorMap(frame, self.colorMaps[self.options['colorMap']-1])
 
         return frame
+
+
+    def activate(self, effect = False):
+
+        if not effect:
+            effect = random.choice(list(self.active))
+
+        if not self.active[effect]:
+            if options['verbose']:
+                print(' (effect '+str(effect)+' is not active')
+            return
+
+        if options['verbose']:
+            print('activating effect '+str(effect))
+
+        # set colormap
+        if effect == 'colorMap':
+            self.options['colorMap'] = random.randint(0, len(self.colorMaps))
+            if options['verbose']: print('changed colorMap to '+str(self.options['colorMap']))
+
+        # set blur
+        elif effect == 'blur':
+            self.options['blur'] = [random.randint(4, maxVals['blur']), random.randint(4, maxVals['blur'])]
+            if options['verbose']: print('set blur to '+str(self.options['blur']))
+
+        # set edge detection
+        elif effect == 'edgeDetection':
+            self.options['edgeDetection'] = random.randint(2, maxVals['edgeDetection'])
+            if options['verbose']: print('set edge detection to '+str(self.options['edgeDetection']))
+
+        # set flip
+        elif effect == 'flip':
+            self.options['flip'] = random.randint(0,1)
+            if options['verbose']: print('set image flip to '+str(self.options['flip']))
+
+        # set sharpening
+        elif effect == 'sharpening':
+            self.options['sharpening'] = random.randint(2, maxVals['sharpening'])
+            if options['verbose']: print('set sharpening to '+str(self.options['sharpening']))
+
+        # set emboss
+        elif effect == 'emboss':
+            self.options['emboss'] = random.randint(2, maxVals['emboss'])
+            if options['verbose']: print('set sharpening to '+str(self.options['emboss']))
+
+        # set inverse
+        elif effect == 'inverse':
+            self.options['inverse'] = random.randint(0,1)
+            if options['verbose']: print('set inverse to '+str(self.options['flip']))
+
+        #set multiple
+        elif effect == 'multiple':
+            if random.randint(0,10) > 7:
+                self.options['multiple'] = random.randint(2, 3)
+            else:
+                self.options['multiple'] = random.randint(4, 6)
+            if options['verbose']: print('set multiple to '+str(self.options['multiple']))
 
 
     def toggle(self, effect, setToBool = 'none' ):
@@ -340,7 +470,6 @@ class EffectProcessor():
         return self.active, self.options
 
 
-debugFont = cv2.FONT_HERSHEY_COMPLEX_SMALL
 
 fps = 0
 target_time = current_time = time.time()
@@ -386,7 +515,7 @@ while True:
         elif fps < 30:
             color = (255,255,0)
 
-        cv2.putText( im, str(fps), (10,20), debugFont, 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, str(fps), (10,options['screenWidth']-80), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
     if options['debugTiming']:
 
@@ -430,22 +559,58 @@ while True:
     if options['debugEffects']:
         activeEffects, effectOptions = effects.getInfo()
 
-        w = 10
+        w = 20
         h = 50
-        x = 80
+        x = 10
         y = 10
 
-        for activeEffect in activeEffects:
+        for key, val in effectOptions.items():
+            key_text = key
 
-            filledPercent = 0
-            color = (0,0,0)
+            if activeEffects[key]:
+                color = (255,255,255)
+            else:
+                color = (0,0,0)
+                val = 0
 
-            if activeEffects[activeEffect]:
-                color = (0,255,0)
-                value = effectOptions[activeEffect] # TODO
-                filledPercent = 1
+            maxVal = 1
+
+            if key == 'colormap':
+                maxVal = len(options['colorMaps'])
+                w = 60
+            elif key == 'blur':
+                maxVal = maxVals['blur']
+                if not activeEffects[key]:
+                    val = (0,0)
+
+                filledPercent = val[0]/maxVal
+                drawDebugRect( im, x, y, w, h, filledPercent, color )
+                x += w+5
+                val = val[1]
+
+            elif key == 'edgeDetection':
+                maxVal = maxVals['edgeDetection']
+                key_text = 'edg'
+            elif key == 'sharpening':
+                maxVal = maxVals['sharpening']
+                key_text = 'shrp'
+            elif key == 'emboss':
+                maxVal = maxVals['emboss']
+                key_text = 'emb'
+            elif key == 'inverse':
+                key_text = 'inv'
+            elif key == 'multiple':
+                val -= 1
+                if val < 0:
+                    val = 0
+                maxVal = 5
+                key_text = 'mult'
+
+            filledPercent = val/maxVal
 
             drawDebugRect( im, x, y, w, h, filledPercent, color )
+            cv2.putText( im, key_text, (x, y+h+8), options['debugFont'], 0.4, color, 1, cv2.LINE_AA )
+
             x += w+5
 
 
@@ -496,10 +661,13 @@ while True:
 
     if onset:
         # TODO: maybe change effects
-        if random.randint(0,1) == 1:
+        randomNumber = random.randint(0,4)
+        if randomNumber == 1:
             videostreams.changeVideostreamIndex()
-        else:
+        elif randomNumber == 2:
             videostreams.changeVideostreamInput()
+        else:
+            effects.activate()
 
 
 print('bye!')
