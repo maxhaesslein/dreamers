@@ -57,6 +57,7 @@ import sys
 import random
 import math
 import pyaudio
+import aubio
 
 
 options = {
@@ -66,6 +67,7 @@ options = {
     'debugStreams': True,
     'debugEffects': True,
     'debugAudio': True,
+    'debugOnset': True,
 
     'verbose': True,
 
@@ -95,6 +97,7 @@ options = {
 
     'audioDevice': 1,
     'audioMaxValue': 30,
+    'audioOnsetMethod': 'specflux', # see https://aubio.org/doc/latest/specdesc_8h.html
 }
 
 
@@ -174,6 +177,7 @@ audioOptions = {
     'inputChannels': 1,
     'format': pyaudio.paInt16,
     'npFormat': np.int16,
+    'onsetMethod': options['audioOnsetMethod']
 }
 
 
@@ -594,7 +598,7 @@ class EffectProcessor():
 
         print('setToBool '+str(setToBool))
 
-        if setToBool is 'none':
+        if setToBool == 'none':
             # toggle
             self.active[effect] = not self.active[effect]
         else:
@@ -674,6 +678,18 @@ class AudioProcessor:
                                     frames_per_buffer=audioOptions['bufferSize'],
                                     rate=audioOptions['sampleRate'])
 
+        self.win_s = audioOptions['bufferSize']
+        self.hop_s = int(self.win_s // 2)
+
+        self.onsetDetection = aubio.onset(audioOptions['onsetMethod'], self.win_s, self.hop_s, audioOptions['sampleRate'])
+
+        if options['verbose']:
+            print('-- start aubio onset detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(self.win_s)+' / hop_s: '+str(self.hop_s)+' / onsetMethod: '+str(audioOptions['onsetMethod']))
+
+
+        self.onset = False
+
+
     def update(self):
 
         # available frames: self.stream.get_read_available()
@@ -681,6 +697,11 @@ class AudioProcessor:
         audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
 
         audioData = np.frombuffer(audiobuffer, dtype=audioOptions['npFormat'])
+
+        self.onset = False
+        signal = np.frombuffer(audiobuffer, dtype=np.float32)
+        if self.onsetDetection(signal):
+            self.onset = True
 
         peak = np.abs(np.max(audioData)-np.min(audioData))/options['audioMaxValue']
 
@@ -692,6 +713,10 @@ class AudioProcessor:
 
     def getData(self):
         return self.peakBuffer, self.peakBufferIndex
+
+
+    def isOnset(self):
+        return self.onset
 
 
     def stop(self):
@@ -709,7 +734,7 @@ def probabilityCheck( key ):
         return False
 
 
-def debugDisplay( im ):
+def debugDisplay( im, onset ):
 
     if options['debugFPS']:
         color = (0,255,0)
@@ -862,6 +887,22 @@ def debugDisplay( im ):
             color = (255,255,255)
 
 
+    if options['debugOnset']:
+
+        w = 60
+        h = 60
+        x = options['screenWidth'] - w - 100
+        y = options['screenHeight'] - h - 10
+
+        filledPercent = 0.0
+        color = (255,255,255)
+        if onset:
+            filledPercent = 1.0
+            color = (0,255,255)
+
+        drawDebugRect( im, x, y, w, h, filledPercent, color )
+
+
     return im
 
 
@@ -887,8 +928,6 @@ while True:
 
     startTime = time.time()
 
-    audio.update()
-
     frame = videostreams.getNextFrame()
     if type(frame) == type(None): # no frame retreived, use last frame
         frame = lastFrame
@@ -913,10 +952,12 @@ while True:
     im = effects.get()
     effects.put(nextIm)
 
-    im = debugDisplay(im)
+    audio.update()
+    onset = audio.isOnset()
+
+    im = debugDisplay(im, onset)
 
     cv2.imshow(options['windowName'], im)
-
 
     usedTime = time.time() - startTime
     timeLeft = targetTime-usedTime
@@ -929,8 +970,6 @@ while True:
     previousTime, currentTime = currentTime, time.time()
     fps = math.ceil(1./(currentTime-previousTime))
     fpsMeasurement = (fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
-
-    onset = False
 
     if key == 27: # escape
         break
