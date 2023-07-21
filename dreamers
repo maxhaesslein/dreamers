@@ -96,9 +96,9 @@ options = {
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
     'changeVideoStream': 15,
-    'repeatVideoStream': 25, # fires on changeVideostream if there is at least a buffer worth of frames # TODO
-    'changeVideoStreamSource': 8, # fires on changeVideostream
-    'clearVideoStreamBuffer': 20, # fires on changeVideostream
+    #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
+    'changeVideoStreamSource': 8, # fires on changeVideoStream
+    'clearVideoStreamBuffer': 10, # fires on changeVideoStream, if changeVideoStreamSource does not fire
     'changeColorMap': 20,
     'setBlur': 125,
     'setEdgeDetection': 160,
@@ -259,21 +259,41 @@ class VideostreamProcessor():
     def changeVideostreamIndex(self):
 
         randomIndex = random.randint(0, options['videostreamCount']-1)
-        if randomIndex == self.index:
-            # don't change to current stream, just abort here
-            return
+        while True:
+            randomIndex += 1
+            if randomIndex >= options['videostreamCount']:
+                randomIndex = 0
+            if randomIndex == self.index:
+                continue
+            # find a stream that has at least 5 frames in its queue:
+            if self.streams[randomIndex]['queue'].qsize() >= 5:
+                break
 
         self.index = randomIndex
+        if options['verbose']: print('change videostream to #'+str(self.index))
 
 
-    def changeVideostreamInput(self):
 
-        randomIndex = random.randint(0, options['videostreamCount']-1)
-        if randomIndex == self.index:
+    def changeVideostreamInput(self, streamIndex = False):
+
+        if streamIndex == False:
+            streamIndex = random.randint(0, options['videostreamCount']-1)
+
+        if streamIndex == self.index:
             # don't change current stream, just abort here
             return
 
-        self.streams[randomIndex] = self.loadVideo()
+        self.streams[streamIndex] = self.loadVideo()
+
+
+    def clearVideostreamBuffer(self, streamIndex):
+
+        if streamIndex == self.index:
+            # don't change current stream, just abort here
+            return
+
+        while not self.streams[streamIndex]['queue'].empty():
+            self.streams[streamIndex]['queue'].get(False)
 
 
     def getNextFrame(self, blocking = False):
@@ -285,6 +305,7 @@ class VideostreamProcessor():
 
         return frame
 
+
     def getInfo(self):
 
         infos = []
@@ -292,6 +313,21 @@ class VideostreamProcessor():
             infos.append(stream['queue'].qsize())
 
         return self.index, infos
+
+
+    def onset(self):
+
+        if not probabilityCheck('changeVideoStream'):
+            return
+
+        oldStream = self.index
+
+        self.changeVideostreamIndex()
+
+        if probabilityCheck('changeVideoStreamSource'):
+            self.changeVideostreamInput(oldStream)
+        elif probabilityCheck('clearVideoStreamBuffer'):
+            self.clearVideostreamBuffer(oldStream);
 
 
 class EffectProcessor():
@@ -811,6 +847,7 @@ while True:
         effects.toggle('multiple')
 
     if onset:
+        videostreams.onset()
         effects.onset()
 
 
