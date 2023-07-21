@@ -67,6 +67,7 @@ options = {
     'verbose': True,
 
     'fps': 30,
+    'fpsSmoothing':  0.9, # this smoothes only the fps _debug display_, NOT the real fps
 
     'screenWidth': 720,
     'screenHeight': 720,
@@ -278,6 +279,7 @@ class EffectProcessor():
         self.queueInput = Queue(maxsize=1)
         self.queueOutput = Queue(maxsize=1)
         self.running = True
+        self.fpsMeasurement = options['fps']
 
         self.kernels = {
             'edgeDetection': np.array([ [-1,-1,-1], [-1, 8,-1], [-1,-1,-1] ]),
@@ -327,12 +329,20 @@ class EffectProcessor():
 
 
     def update(self):
+
+        previousTime = currentTime = time.time()
+
         while self.running:
             frame = self.queueInput.get(True)
 
             frame = self.apply(frame)
 
             self.queueOutput.put(frame)
+
+            previousTime, currentTime = currentTime, time.time()
+            fps = math.ceil(1./(currentTime-previousTime))
+            self.fpsMeasurement = (self.fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
+
 
 
     def put(self, frame):
@@ -346,7 +356,7 @@ class EffectProcessor():
     def apply(self, frame):
 
         # convert to grayscale for faster effect computation
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # inverse
         if self.active['inverse'] and self.options['inverse'] > 0:
@@ -403,7 +413,7 @@ class EffectProcessor():
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
 
         # convert back to bgr
-        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         # tint image
         if self.active['colorMap'] and self.options['colorMap'] > 0:
@@ -496,7 +506,7 @@ class EffectProcessor():
 
 
     def getInfo(self):
-        return self.active, self.options
+        return self.active, self.options, self.fpsMeasurement
 
 
     def stop(self):
@@ -508,7 +518,6 @@ targetTime = 1./options['fps']
 previousTime = currentTime = time.time()
 sleep_time = 0
 
-fpsSmoothing = 0.9
 fpsMeasurement = options['fps']
 
 videostreams = VideostreamProcessor().start()
@@ -556,7 +565,9 @@ while True:
         elif fpsMeasurement < 28:
             color = (0,255,255)
 
-        cv2.putText( im, str(int(fpsMeasurement)), (options['screenWidth']-30, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        text = 'Main FPS: '+str(int(fpsMeasurement))
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
     if options['debugTiming']:
 
@@ -598,7 +609,7 @@ while True:
             x += w+5
 
     if options['debugEffects']:
-        activeEffects, effectOptions = effects.getInfo()
+        activeEffects, effectOptions, effectsFpsMeasurement = effects.getInfo()
 
         w = 20
         h = 50
@@ -655,6 +666,17 @@ while True:
             x += w+5
 
 
+        color = (0,255,0)
+        if effectsFpsMeasurement < 20:
+            color = (0,0,255)
+        elif effectsFpsMeasurement < 28:
+            color = (0,255,255)
+
+        text = 'Effects FPS: '+str(int(effectsFpsMeasurement))
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 60), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+
+
     cv2.imshow(options['windowName'], im)
 
 
@@ -668,7 +690,7 @@ while True:
 
     previousTime, currentTime = currentTime, time.time()
     fps = math.ceil(1./(currentTime-previousTime))
-    fpsMeasurement = (fpsMeasurement * fpsSmoothing) + (fps * (1.0-fpsSmoothing))
+    fpsMeasurement = (fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
 
     onset = False
 
