@@ -94,6 +94,7 @@ options = {
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
     'audioDevice': 1,
+    'audioMaxValue': 30,
 }
 
 
@@ -662,10 +663,11 @@ class EffectProcessor():
 class AudioProcessor:
     def __init__(self):
 
-        self.audioData = False
+        self.peakBuffer = np.zeros(options['fps'])
+        self.peakBufferIndex = 0
 
-        audio = pyaudio.PyAudio()
-        self.stream = audio.open(format=audioOptions['format'],
+        self.audio = pyaudio.PyAudio()
+        self.stream = self.audio.open(format=audioOptions['format'],
                                     input=True,
                                     channels=audioOptions['inputChannels'],
                                     input_device_index=audioOptions['deviceIndex'],
@@ -678,15 +680,18 @@ class AudioProcessor:
 
         audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
 
-        self.audioData = np.frombuffer(audiobuffer, dtype=audioOptions['npFormat'])
+        audioData = np.frombuffer(audiobuffer, dtype=audioOptions['npFormat'])
 
-        #maxValue = 30 # TODO: what is this value??
-        #peak = np.abs(np.max(data)-np.min(data))/maxValue
-        #print('#'*int(peak))
+        peak = np.abs(np.max(audioData)-np.min(audioData))/options['audioMaxValue']
+
+        self.peakBuffer[self.peakBufferIndex] = peak
+        self.peakBufferIndex += 1
+        if self.peakBufferIndex >= len(self.peakBuffer):
+            self.peakBufferIndex = 0
 
 
     def getData(self):
-        return self.audioData
+        return self.peakBuffer, self.peakBufferIndex
 
 
     def stop(self):
@@ -835,16 +840,26 @@ def debugDisplay( im ):
 
     if options['debugAudio']:
 
-        data = audio.getData()
+        data, index = audio.getData()
+        index -= 1
+        if index < 0:
+            index = options['fps']-1
 
-        w = int(options['screenWidth']/options['fps'])
-        x = int(frameNumber%options['fps'])*w
+        w = int(options['screenWidth']/len(data))
+        x = options['screenWidth']-w
         y = int(options['screenHeight'] / 2)
 
-        maxValue = 30 # TODO: what is this value??
-        h = int(np.abs(np.max(data)-np.min(data))/maxValue)
-
-        cv2.rectangle( im, (x,y), (x+w, y-h), (255,255,255), -1 )
+        color = (255,0,0)
+        for i in range(len(data)):
+            h = int(data[index])
+            cv2.rectangle( im, (x,y), (x+w, y-h), color, -1 )
+            x += w
+            index += 1
+            if index >= len(data):
+                index = 0
+            if x >= options['screenWidth']:
+                x = 0
+            color = (255,255,255)
 
 
     return im
