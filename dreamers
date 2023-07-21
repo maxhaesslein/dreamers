@@ -79,6 +79,8 @@ options = {
     'videoProcessorTimeout': 0.05,
 
 
+    'sensitivity': 0.7, # 0.1 - 1.0; lower means slower, higher means faster
+
     'windowName': 'The Dreamers',
 
     'videoExtension': 'mp4',
@@ -89,6 +91,26 @@ options = {
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 }
 
+
+# probabilites:
+# the higher the number, the less likely the hit; 0 means hit every time
+probabilities = {
+    'changeVideoStream': 15,
+    'repeatVideoStream': 25, # fires on changeVideostream if there is at least a buffer worth of frames # TODO
+    'changeVideoStreamSource': 8, # fires on changeVideostream
+    'clearVideoStreamBuffer': 20, # fires on changeVideostream
+    'changeColorMap': 20,
+    'setBlur': 125,
+    'setEdgeDetection': 160,
+    'setFlip': 200,
+    'unsetFlip': 40,
+    'setSharpening': 110,
+    'setEmboss': 125,
+    'setInverse': 80,
+    'unsetInverse': 12,
+    'setMultiple': 330,
+    'unsetMultiple': 60
+}
 
 maxVals = {
     'blur': 30,
@@ -355,9 +377,6 @@ class EffectProcessor():
 
     def apply(self, frame):
 
-        # convert to grayscale for faster effect computation
-        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
         # inverse
         if self.active['inverse'] and self.options['inverse'] > 0:
             frame = cv2.LUT(frame, self.luts['inverse'])
@@ -412,9 +431,6 @@ class EffectProcessor():
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
 
-        # convert back to bgr
-        #frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-
         # tint image
         if self.active['colorMap'] and self.options['colorMap'] > 0:
             frame = cv2.applyColorMap(frame, self.colorMaps[self.options['colorMap']-1])
@@ -427,7 +443,15 @@ class EffectProcessor():
         if not effect:
             effect = random.choice(list(self.active))
 
-        if not self.active[effect]:
+        effectCheck = effect
+        if effect == 'unFlip':
+            effectCheck = 'flip'
+        elif effect == 'unInverse':
+            effectCheck = 'inverse'
+        elif effect == 'unMultiple':
+            effectCheck = 'multiple'
+
+        if not self.active[effectCheck]:
             if options['verbose']:
                 print(' (effect '+str(effect)+' is not active')
             return
@@ -452,8 +476,12 @@ class EffectProcessor():
 
         # set flip
         elif effect == 'flip':
-            self.options['flip'] = random.randint(0,1)
-            if options['verbose']: print('set image flip to '+str(self.options['flip']))
+            self.options['flip'] = 1
+            if options['verbose']: print('set image flip')
+        # unset flip
+        elif effect == 'unFlip':
+            self.options['flip'] = 0
+            if options['verbose']: print('reset image flip')
 
         # set sharpening
         elif effect == 'sharpening':
@@ -467,16 +495,24 @@ class EffectProcessor():
 
         # set inverse
         elif effect == 'inverse':
-            self.options['inverse'] = random.randint(0,1)
-            if options['verbose']: print('set inverse to '+str(self.options['flip']))
+            self.options['inverse'] = 1
+            if options['verbose']: print('set inverse')
+        # unset inverse
+        elif effect == 'unInverse':
+            self.options['inverse'] = 0
+            if options['verbose']: print('reset inverse')
 
-        #set multiple
+        # set multiple
         elif effect == 'multiple':
             if random.randint(0,10) > 7:
                 self.options['multiple'] = random.randint(2, 3)
             else:
                 self.options['multiple'] = random.randint(4, 6)
             if options['verbose']: print('set multiple to '+str(self.options['multiple']))
+        # unset multiple
+        elif effect == 'unMultiple':
+            self.options['multiple'] = 0
+            if options['verbose']: print('reset multiple')
 
 
     def toggle(self, effect, setToBool = 'none' ):
@@ -505,12 +541,61 @@ class EffectProcessor():
             print('set effect '+str(effect)+' to '+str(self.active[effect]))
 
 
+    def onset(self):
+
+        # set colormap
+        if probabilityCheck('changeColorMap'):
+            self.activate('colorMap')
+
+        # set blur
+        if probabilityCheck('setBlur'):
+            self.activate('blur')
+
+        # set edge detection
+        if probabilityCheck('setEdgeDetection'):
+            self.activate('edgeDetection')
+
+        # set flip
+        if self.options['flip'] and probabilityCheck('unsetFlip'):
+            self.activate('unFlip')
+        elif probabilityCheck('setFlip'):
+            self.activate('flip')
+
+        # set sharpening
+        if probabilityCheck('setSharpening'):
+            self.activate('sharpening')
+
+        # set emboss
+        if probabilityCheck('setEmboss'):
+            self.activate('emboss')
+
+        # set inverse
+        if self.options['inverse'] and probabilityCheck('unsetInverse'):
+            self.activate('unInverse')
+        elif probabilityCheck('setInverse'):
+            self.activate('inverse')
+
+        # set multiple
+        if self.options['multiple'] and probabilityCheck('unsetMultiple'):
+            self.activate('unMultiple')
+        elif probabilityCheck('setMultiple'):
+            self.activate('multiple')
+
+
+
     def getInfo(self):
         return self.active, self.options, self.fpsMeasurement
 
 
     def stop(self):
         self.running = False
+
+
+def probabilityCheck( key ):
+    if random.randint(0, probabilities[key])+1 <= options['sensitivity']*10:
+        return True
+    else:
+        return False
 
 
 
@@ -726,14 +811,7 @@ while True:
         effects.toggle('multiple')
 
     if onset:
-        # TODO: maybe change effects
-        randomNumber = random.randint(0,4)
-        if randomNumber == 1:
-            videostreams.changeVideostreamIndex()
-        elif randomNumber == 2:
-            videostreams.changeVideostreamInput()
-        else:
-            effects.activate()
+        effects.onset()
 
 
 print('bye!')
