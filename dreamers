@@ -42,6 +42,7 @@ print("      e: toggle videostreams debug display")
 print("      r: toggle effects debug display")
 print("      t: toggle audio debug display")
 print("      z: toggle onset debug display")
+print("      d: toggle all debug displays")
 print('')
 #print("    ,: decrease sensitivity")
 #print("    .: increase sensitivity")
@@ -73,7 +74,7 @@ options = {
     'debugTiming': True,
     'debugStreams': True,
     'debugEffects': True,
-    'debugAudio': False,
+    'debugAudio': True,
     'debugOnset': True,
 
     'verbose': True,
@@ -681,6 +682,8 @@ class AudioProcessor:
         self.running = True
         self.queue = Queue()
 
+        self.fpsMeasurement = options['fps']
+
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
@@ -716,6 +719,8 @@ class AudioProcessor:
 
     def update(self):
 
+        previousTime = currentTime = time.time()
+
         targetTime = 1./options['fps']
 
         while self.running:
@@ -749,6 +754,11 @@ class AudioProcessor:
                 self.queue.put(True)
 
 
+            previousTime, currentTime = currentTime, time.time()
+            fps = math.ceil(1./(currentTime-previousTime))
+            self.fpsMeasurement = (self.fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
+
+
             usedTime = time.time() - startTime
             timeLeft = targetTime-usedTime
             if timeLeft < 0:
@@ -757,8 +767,8 @@ class AudioProcessor:
             time.sleep(timeLeft)
 
 
-    def getData(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex
+    def getInfo(self):
+        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement
 
 
     def isOnset(self):
@@ -916,7 +926,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index = audio.getData()
+        data, onsetData, index, audioFpsMeasurement = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -942,6 +952,16 @@ def debugDisplay( im, onset ):
                 index = 0
             if x >= options['screenWidth']:
                 x = 0
+
+        color = (0,255,0)
+        if audioFpsMeasurement < 20:
+            color = (0,0,255)
+        elif audioFpsMeasurement < 28:
+            color = (0,255,255)
+
+        text = 'Audio FPS: '+str(int(audioFpsMeasurement))
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 90), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
 
     if options['debugOnset']:
@@ -1081,6 +1101,16 @@ while True:
         options['debugAudio'] = not options['debugAudio']
     elif key&0xFF == ord('z'):
         options['debugOnset'] = not options['debugOnset']
+
+    elif key&0xFF == ord('d'):
+        newBool = not options['debugFPS']
+        options['debugFPS'] = newBool
+        options['debugTiming'] = newBool
+        options['debugStreams'] = newBool
+        options['debugEffects'] = newBool
+        options['debugAudio'] = newBool
+        options['debugOnset'] = newBool
+
 
     if onset:
         videostreams.onset()
