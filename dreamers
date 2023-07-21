@@ -634,49 +634,7 @@ def probabilityCheck( key ):
         return False
 
 
-
-targetTime = 1./options['fps']
-previousTime = currentTime = time.time()
-sleep_time = 0
-
-fpsMeasurement = options['fps']
-
-videostreams = VideostreamProcessor().start()
-effects = EffectProcessor().start()
-
-lastFrame = videostreams.getNextFrame(True)
-effects.put(lastFrame)
-
-time.sleep(1)
-
-# main loop
-while True:
-
-    startTime = time.time()
-
-    frame = videostreams.getNextFrame()
-    if type(frame) == type(None): # no frame retreived, use last frame
-        frame = lastFrame
-
-    lastFrame = frame
-
-    # resize frame
-    frameHeight, frameWidth, frameChannels = frame.shape
-    targetWidth = options['screenWidth']
-    targetHeight = int(targetWidth * frameHeight/frameWidth)
-    if targetHeight < options['screenHeight']:
-        targetHeight = options['screenHeight']
-        targetWidth = int(targetHeight * frameWidth/frameHeight)
-
-    marginX = int((targetWidth - options['screenWidth'])/2)
-    marginY = int((targetHeight - options['screenHeight'])/2)
-
-    im = cv2.resize( frame, (targetWidth, targetHeight) )
-    im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
-
-    nextIm = im
-    im = effects.get()
-    effects.put(nextIm)
+def debugDisplay( im ):
 
     if options['debugFPS']:
         color = (0,255,0)
@@ -732,13 +690,12 @@ while True:
     if options['debugEffects']:
         activeEffects, effectOptions, effectsFpsMeasurement = effects.getInfo()
 
-        w = 20
         h = 50
         x = 10
         y = 10
 
         for key, val in effectOptions.items():
-            key_text = key
+            text = key
 
             if activeEffects[key]:
                 color = (255,255,255)
@@ -748,41 +705,49 @@ while True:
 
             maxVal = 1
 
-            if key == 'colormap':
+            w = 20
+            textX = x
+
+            if key == 'colorMap':
                 maxVal = len(options['colorMaps'])
-                w = 60
+                text = 'col'
             elif key == 'blur':
                 maxVal = maxVals['blur']
                 if not activeEffects[key]:
                     val = (0,0)
 
+                w = 15
+
                 filledPercent = val[0]/maxVal
                 drawDebugRect( im, x, y, w, h, filledPercent, color )
-                x += w+5
+                x += w+2
+                textX = x-int(w/2)
                 val = val[1]
 
             elif key == 'edgeDetection':
                 maxVal = maxVals['edgeDetection']
-                key_text = 'edg'
+                text = 'edg'
             elif key == 'sharpening':
                 maxVal = maxVals['sharpening']
-                key_text = 'shrp'
+                text = 'shrp'
             elif key == 'emboss':
                 maxVal = maxVals['emboss']
-                key_text = 'emb'
+                text = 'emb'
             elif key == 'inverse':
-                key_text = 'inv'
+                text = 'inv'
             elif key == 'multiple':
                 val -= 1
                 if val < 0:
                     val = 0
                 maxVal = 5
-                key_text = 'mult'
+                text = 'mult'
 
             filledPercent = val/maxVal
 
             drawDebugRect( im, x, y, w, h, filledPercent, color )
-            cv2.putText( im, key_text, (x, y+h+8), options['debugFont'], 0.4, color, 1, cv2.LINE_AA )
+            textsize = cv2.getTextSize(text, options['debugFont'], 0.4, 1)[0]
+            textX += int(w/2)-int(textsize[0]/2)
+            cv2.putText( im, text, (textX, y+h+8), options['debugFont'], 0.4, color, 1, cv2.LINE_AA )
 
             x += w+5
 
@@ -797,6 +762,53 @@ while True:
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 60), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
+    return im
+
+
+targetTime = 1./options['fps']
+previousTime = currentTime = time.time()
+sleep_time = 0
+
+fpsMeasurement = options['fps']
+
+videostreams = VideostreamProcessor().start()
+effects = EffectProcessor().start()
+
+lastFrame = videostreams.getNextFrame(True)
+effects.put(lastFrame)
+
+time.sleep(1)
+
+# main loop
+while True:
+
+    startTime = time.time()
+
+    frame = videostreams.getNextFrame()
+    if type(frame) == type(None): # no frame retreived, use last frame
+        frame = lastFrame
+
+    lastFrame = frame
+
+    # resize frame
+    frameHeight, frameWidth, frameChannels = frame.shape
+    targetWidth = options['screenWidth']
+    targetHeight = int(targetWidth * frameHeight/frameWidth)
+    if targetHeight < options['screenHeight']:
+        targetHeight = options['screenHeight']
+        targetWidth = int(targetHeight * frameWidth/frameHeight)
+
+    marginX = int((targetWidth - options['screenWidth'])/2)
+    marginY = int((targetHeight - options['screenHeight'])/2)
+
+    im = cv2.resize( frame, (targetWidth, targetHeight) )
+    im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
+
+    nextIm = im
+    im = effects.get()
+    effects.put(nextIm)
+
+    im = debugDisplay(im)
 
     cv2.imshow(options['windowName'], im)
 
