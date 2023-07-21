@@ -85,6 +85,9 @@ options = {
     'screenHeight': 720,
 
 
+    'processEffectsBeforeResize': True,
+
+
     'videostreamCount': 32,
     'videostreamMaxQueueSize': 20,
 
@@ -921,9 +924,14 @@ fpsMeasurement = options['fps']
 videostreams = VideostreamProcessor().start()
 effects = EffectProcessor().start()
 
+time.sleep(0.5)
+
 audio = AudioProcessor()
 
-effects.put(startupImage)
+if options['processEffectsBeforeResize']:
+    effects.put(videostreams.getNextFrame())
+else:
+    effects.put(startupImage)
 
 time.sleep(1)
 
@@ -940,6 +948,11 @@ while True:
 
     lastFrame = frame
 
+    if options['processEffectsBeforeResize']:
+        nextFrame = frame
+        frame = effects.get()
+        effects.put(nextFrame)
+
     # resize frame
     frameHeight, frameWidth, frameChannels = frame.shape
     targetWidth = options['screenWidth']
@@ -954,9 +967,10 @@ while True:
     im = cv2.resize( frame, (targetWidth, targetHeight) )
     im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
 
-    nextIm = im
-    im = effects.get()
-    effects.put(nextIm)
+    if not options['processEffectsBeforeResize']:
+        nextIm = im
+        im = effects.get()
+        effects.put(nextIm)
 
     audio.update()
     onset = audio.isOnset()
