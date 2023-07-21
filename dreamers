@@ -65,6 +65,7 @@ options = {
     'debugTiming': True,
     'debugStreams': True,
     'debugEffects': True,
+    'debugAudio': True,
 
     'verbose': True,
 
@@ -131,7 +132,7 @@ cv2.setWindowProperty( options['windowName'], cv2.WND_PROP_FULLSCREEN, cv2.WINDO
 
 
 # display startup image
-startup_image = np.zeros((options['screenWidth'], options['screenHeight'], 3), np.uint8)
+startupImage = np.zeros((options['screenWidth'], options['screenHeight'], 3), np.uint8)
 font = cv2.FONT_HERSHEY_TRIPLEX # TODO: use custom font
 text = "The Dreamers"
 fontsize = 2
@@ -139,15 +140,15 @@ fontwidth = 3
 textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
 textX = int((options['screenWidth'] - textsize[0]) / 2)
 textY = int((options['screenHeight'] - textsize[1]) / 2)
-cv2.putText(startup_image, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
+cv2.putText(startupImage, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
 text = "loading ...".upper()
 fontsize = 1
 fontwidth = 1
 textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
 textX = int((options['screenWidth'] - textsize[0]) / 2)
 textY = int((options['screenHeight'] - textsize[1]))
-cv2.putText(startup_image, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
-cv2.imshow(options['windowName'], startup_image)
+cv2.putText(startupImage, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
+cv2.imshow(options['windowName'], startupImage)
 cv2.waitKey(60)
 
 
@@ -167,10 +168,12 @@ if audioDevice['maxInputChannels'] <= 0:
     sys.exit()
 audioOptions = {
     'deviceIndex': audioDevice['index'],
-    'sampleRate': audioDevice['defaultSampleRate'],
-    'bufferSize': audioDevice['defaultSampleRate']/options['fps']
+    'sampleRate': int(audioDevice['defaultSampleRate']),
+    'bufferSize': int(audioDevice['defaultSampleRate']/options['fps']),
+    'inputChannels': 1,
+    'format': pyaudio.paInt16,
+    'npFormat': np.int16,
 }
-
 
 
 # find videos:
@@ -179,6 +182,8 @@ videoFiles = [f for f in os.listdir(options['videoPath']) if os.path.isfile(os.p
 
 if options['verbose']:
     print('')
+    print('---------')
+    print('')
     print('-- options --')
     print(options)
     print('')
@@ -186,8 +191,10 @@ if options['verbose']:
     print(audioOptions)
     print('')
     print('-- video files --')
-    print(str(len(videoFiles))+' videofiles')
-    #print(videoFiles)
+    print(str(len(videoFiles))+' videos found')
+    print('')
+    print('---------')
+    print('')
 
 
 def drawDebugRect( im, x, y, w, h, p, c ):
@@ -652,6 +659,44 @@ class EffectProcessor():
         self.running = False
 
 
+class AudioProcessor:
+    def __init__(self):
+
+        self.audioData = False
+
+        audio = pyaudio.PyAudio()
+        self.stream = audio.open(format=audioOptions['format'],
+                                    input=True,
+                                    channels=audioOptions['inputChannels'],
+                                    input_device_index=audioOptions['deviceIndex'],
+                                    frames_per_buffer=audioOptions['bufferSize'],
+                                    rate=audioOptions['sampleRate'])
+
+    def update(self):
+
+        # available frames: self.stream.get_read_available()
+
+        audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
+
+        self.audioData = np.frombuffer(audiobuffer, dtype=audioOptions['npFormat'])
+
+        #maxValue = 30 # TODO: what is this value??
+        #peak = np.abs(np.max(data)-np.min(data))/maxValue
+        #print('#'*int(peak))
+
+
+    def getData(self):
+        return self.audioData
+
+
+    def stop(self):
+
+        self.stream.stop_stream()
+        self.stream.close()
+        self.audio.terminate()
+
+
+
 def probabilityCheck( key ):
     if random.randint(0, probabilities[key])+1 <= options['sensitivity']*10:
         return True
@@ -787,6 +832,21 @@ def debugDisplay( im ):
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 60), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
+
+    if options['debugAudio']:
+
+        data = audio.getData()
+
+        w = int(options['screenWidth']/options['fps'])
+        x = int(frameNumber%options['fps'])*w
+        y = int(options['screenHeight'] / 2)
+
+        maxValue = 30 # TODO: what is this value??
+        h = int(np.abs(np.max(data)-np.min(data))/maxValue)
+
+        cv2.rectangle( im, (x,y), (x+w, y-h), (255,255,255), -1 )
+
+
     return im
 
 
@@ -799,15 +859,20 @@ fpsMeasurement = options['fps']
 videostreams = VideostreamProcessor().start()
 effects = EffectProcessor().start()
 
-lastFrame = videostreams.getNextFrame(True)
-effects.put(lastFrame)
+audio = AudioProcessor()
+
+effects.put(startupImage)
 
 time.sleep(1)
+
+frameNumber = 0
 
 # main loop
 while True:
 
     startTime = time.time()
+
+    audio.update()
 
     frame = videostreams.getNextFrame()
     if type(frame) == type(None): # no frame retreived, use last frame
@@ -887,11 +952,14 @@ while True:
         videostreams.onset()
         effects.onset()
 
+    frameNumber += 1
+
 
 print('bye!')
 
 effects.stop()
 videostreams.stop()
+audio.stop()
 
 cv2.destroyAllWindows()
 
