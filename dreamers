@@ -54,6 +54,7 @@ import cv2
 import time
 import os
 import random
+import math
 
 
 options = {
@@ -503,10 +504,12 @@ class EffectProcessor():
 
 
 
-fps = 0
 targetTime = 1./options['fps']
 previousTime = currentTime = time.time()
 sleep_time = 0
+
+fpsSmoothing = 0.9
+fpsMeasurement = options['fps']
 
 videostreams = VideostreamProcessor().start()
 effects = EffectProcessor().start()
@@ -521,14 +524,11 @@ while True:
 
     startTime = time.time()
 
-    nextFrame = videostreams.getNextFrame()
-    if type(nextFrame) == type(None): # no frame retreived, use last frame
-        nextFrame = lastFrame
+    frame = videostreams.getNextFrame()
+    if type(frame) == type(None): # no frame retreived, use last frame
+        frame = lastFrame
 
-    lastFrame = nextFrame
-
-    frame = effects.get()
-    effects.put(nextFrame)
+    lastFrame = frame
 
     # resize frame
     frameHeight, frameWidth, frameChannels = frame.shape
@@ -542,18 +542,21 @@ while True:
     marginY = int((targetHeight - options['screenHeight'])/2)
 
     im = cv2.resize( frame, (targetWidth, targetHeight) )
-
     im = im[marginY:marginY+options['screenHeight'], marginX:marginX+options['screenWidth']]
+
+    nextIm = im
+    im = effects.get()
+    effects.put(nextIm)
 
     if options['debugFPS']:
         color = (0,255,0)
 
-        if fps < 25:
-            color = (255,0,0)
-        elif fps < 30:
-            color = (255,255,0)
+        if fpsMeasurement < 20:
+            color = (0,0,255)
+        elif fpsMeasurement < 28:
+            color = (0,255,255)
 
-        cv2.putText( im, str(fps), (options['screenWidth']-30, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, str(int(fpsMeasurement)), (options['screenWidth']-30, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
     if options['debugTiming']:
 
@@ -655,16 +658,17 @@ while True:
     cv2.imshow(options['windowName'], im)
 
 
-    previousTime, currentTime = currentTime, time.time()
-    usedTime = currentTime - startTime
+    usedTime = time.time() - startTime
     timeLeft = targetTime-usedTime
-    fps = int(1./(currentTime-previousTime))
     sleep_time = int((timeLeft)*1000)
-    print(sleep_time)
     if sleep_time < 1:
         sleep_time = 1
 
     key = cv2.waitKey(sleep_time)
+
+    previousTime, currentTime = currentTime, time.time()
+    fps = math.ceil(1./(currentTime-previousTime))
+    fpsMeasurement = (fpsMeasurement * fpsSmoothing) + (fps * (1.0-fpsSmoothing))
 
     onset = False
 
