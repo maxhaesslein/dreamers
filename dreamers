@@ -678,6 +678,9 @@ class EffectProcessor():
 class AudioProcessor:
     def __init__(self):
 
+        self.running = True
+        self.queue = Queue()
+
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
@@ -703,30 +706,55 @@ class AudioProcessor:
         self.onset = False
 
 
+    def start(self):
+
+        t = Thread(target=self.update, args=())
+        t.daemon = True
+        t.start()
+        return self
+
+
     def update(self):
 
-        # available frames: self.stream.get_read_available()
+        targetTime = 1./options['fps']
 
-        audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
+        while self.running:
 
-        self.onset = False
-        signal = np.frombuffer(audiobuffer, dtype=np.float32)
-        if self.onsetDetection(signal):
-            self.onset = True
+            startTime = time.time()
 
-        if self.tempoDetection(signal):
-            self.onset = True
+            # available frames: self.stream.get_read_available()
 
-        # current bpm: print(self.tempoDetection.get_bpm())
+            audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
 
-        peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+            self.onset = False
+            signal = np.frombuffer(audiobuffer, dtype=np.float32)
+            if self.onsetDetection(signal):
+                self.onset = True
 
-        self.peakBuffer[self.peakBufferIndex] = peak
-        self.peakBufferOnset[self.peakBufferIndex] = self.onset
+            if self.tempoDetection(signal):
+                self.onset = True
 
-        self.peakBufferIndex += 1
-        if self.peakBufferIndex >= len(self.peakBuffer):
-            self.peakBufferIndex = 0
+            # current bpm: print(self.tempoDetection.get_bpm())
+
+            peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+
+            self.peakBuffer[self.peakBufferIndex] = peak
+            self.peakBufferOnset[self.peakBufferIndex] = self.onset
+
+            self.peakBufferIndex += 1
+            if self.peakBufferIndex >= len(self.peakBuffer):
+                self.peakBufferIndex = 0
+
+            if self.onset:
+                self.queue.put(True)
+
+
+            usedTime = time.time() - startTime
+            timeLeft = targetTime-usedTime
+            if timeLeft < 0:
+                timeLeft = 0
+
+            time.sleep(timeLeft)
 
 
     def getData(self):
@@ -734,10 +762,15 @@ class AudioProcessor:
 
 
     def isOnset(self):
-        return self.onset
+        if self.queue.qsize() > 0:
+            return self.queue.get()
+
+        return False
 
 
     def stop(self):
+
+        self.running = False
 
         self.stream.stop_stream()
         self.stream.close()
@@ -938,10 +971,9 @@ fpsMeasurement = options['fps']
 
 videostreams = VideostreamProcessor().start()
 effects = EffectProcessor().start()
+audio = AudioProcessor().start()
 
 time.sleep(0.5)
-
-audio = AudioProcessor()
 
 if options['processEffectsBeforeResize']:
     effects.put(videostreams.getNextFrame())
@@ -987,7 +1019,6 @@ while True:
         im = effects.get()
         effects.put(nextIm)
 
-    audio.update()
     onset = audio.isOnset()
     # TODO: if last onset is way too long ago, force onset
 
