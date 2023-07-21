@@ -25,6 +25,7 @@ print("")
 #print("    e: exit to console")
 print("    esc: exit")
 print("  space: fake onset")
+print('')
 print("      1: toggle effect 'colorMap'")
 print("      2: toggle effect 'blur'")
 print("      3: toggle effect 'edgeDetection'")
@@ -34,14 +35,20 @@ print("      6: toggle effect 'emboss'")
 print("      7: toggle effect 'inverse'")
 print("      8: toggle effect 'multiple'")
 print("      0: toggle all effects")
+print('')
+print("      q: toggle FPS debug display")
+print("      w: toggle timing debug display")
+print("      e: toggle videostreams debug display")
+print("      r: toggle effects debug display")
+print("      t: toggle audio debug display")
+print("      z: toggle onset debug display")
+print('')
 #print("    ,: decrease sensitivity")
 #print("    .: increase sensitivity")
 #print("    n: decrease speed")
 #print("    m: increase speed")
 #print("    s: sharpening overlay")
-#print("    w: soundstream overlay")
 #print("    p: pause rendering")
-#print("    d: debug screen level")
 #print("    v: verbose level")
 print("")
 print("###############################")
@@ -66,7 +73,7 @@ options = {
     'debugTiming': True,
     'debugStreams': True,
     'debugEffects': True,
-    'debugAudio': True,
+    'debugAudio': False,
     'debugOnset': True,
 
     'verbose': True,
@@ -96,8 +103,9 @@ options = {
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
     'audioDevice': 1,
-    'audioMaxValue': 30,
     'audioOnsetMethod': 'specflux', # see https://aubio.org/doc/latest/specdesc_8h.html
+    'audioDisplayScaling': 10000,
+
 }
 
 
@@ -175,7 +183,7 @@ audioOptions = {
     'sampleRate': int(audioDevice['defaultSampleRate']),
     'bufferSize': int(audioDevice['defaultSampleRate']/options['fps']),
     'inputChannels': 1,
-    'format': pyaudio.paInt16,
+    'format': pyaudio.paFloat32,
     'npFormat': np.int16,
     'onsetMethod': options['audioOnsetMethod']
 }
@@ -526,7 +534,7 @@ class EffectProcessor():
 
         if not self.active[effectCheck]:
             if options['verbose']:
-                print(' (effect '+str(effect)+' is not active')
+                print(' (effect '+str(effect)+' is not active)')
             return
 
         if options['verbose']:
@@ -678,13 +686,13 @@ class AudioProcessor:
                                     frames_per_buffer=audioOptions['bufferSize'],
                                     rate=audioOptions['sampleRate'])
 
-        self.win_s = audioOptions['bufferSize']
+        self.win_s = audioOptions['bufferSize']*2
         self.hop_s = int(self.win_s // 2)
 
         self.onsetDetection = aubio.onset(audioOptions['onsetMethod'], self.win_s, self.hop_s, audioOptions['sampleRate'])
 
         if options['verbose']:
-            print('-- start aubio onset detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(self.win_s)+' / hop_s: '+str(self.hop_s)+' / onsetMethod: '+str(audioOptions['onsetMethod']))
+            print('start aubio onset detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(self.win_s)+' / hop_s: '+str(self.hop_s)+' / onsetMethod: '+str(audioOptions['onsetMethod']))
 
 
         self.onset = False
@@ -696,14 +704,12 @@ class AudioProcessor:
 
         audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
 
-        audioData = np.frombuffer(audiobuffer, dtype=audioOptions['npFormat'])
-
         self.onset = False
         signal = np.frombuffer(audiobuffer, dtype=np.float32)
         if self.onsetDetection(signal):
             self.onset = True
 
-        peak = np.abs(np.max(audioData)-np.min(audioData))/options['audioMaxValue']
+        peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
         self.peakBuffer[self.peakBufferIndex] = peak
         self.peakBufferIndex += 1
@@ -889,16 +895,16 @@ def debugDisplay( im, onset ):
 
     if options['debugOnset']:
 
-        w = 60
-        h = 60
-        x = options['screenWidth'] - w - 100
+        w = 100
+        h = 100
+        x = options['screenWidth'] - w - 70
         y = options['screenHeight'] - h - 10
 
         filledPercent = 0.0
         color = (255,255,255)
         if onset:
             filledPercent = 1.0
-            color = (0,255,255)
+            color = (0,0,255)
 
         drawDebugRect( im, x, y, w, h, filledPercent, color )
 
@@ -954,6 +960,7 @@ while True:
 
     audio.update()
     onset = audio.isOnset()
+    # TODO: if last onset is way too long ago, force onset
 
     im = debugDisplay(im, onset)
 
@@ -1001,6 +1008,19 @@ while True:
         effects.toggle('inverse')
     elif key&0xFF == ord('8'):
         effects.toggle('multiple')
+
+    elif key&0xFF == ord('q'):
+        options['debugFPS'] = not options['debugFPS']
+    elif key&0xFF == ord('w'):
+        options['debugTiming'] = not options['debugTiming']
+    elif key&0xFF == ord('e'):
+        options['debugStreams'] = not options['debugStreams']
+    elif key&0xFF == ord('r'):
+        options['debugEffects'] = not options['debugEffects']
+    elif key&0xFF == ord('t'):
+        options['debugAudio'] = not options['debugAudio']
+    elif key&0xFF == ord('z'):
+        options['debugOnset'] = not options['debugOnset']
 
     if onset:
         videostreams.onset()
