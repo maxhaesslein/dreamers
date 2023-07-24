@@ -79,22 +79,25 @@ options = {
 
     'verbose': True,
 
+
     'fps': 25,
     'fpsSmoothing':  0.9, # this smoothes only the fps _debug display_, NOT the real fps
 
-    'screenWidth': 720, #1280,
-    'screenHeight': 720,
+    'screenWidth': 960, # 1280
+    'screenHeight': 540, # 720
 
 
+    'effectsActive': True,
+    'skipFrameResize': False,
     'processEffectsBeforeResize': False,
-    'resizeFrameOnLoad': True,
+    'resizeFrameOnLoad': False,
 
 
-    'videostreamCount': 16,
+    'videostreamCount': 20,
     'videostreamMaxQueueSize': 20,
 
 
-    'sensitivity': 0.7, # 0.1 - 1.0; lower means slower, higher means faster
+    'sensitivity': 0.7, # lower means slower, higher means faster; 0.1 - 2.0
 
     'windowName': 'The Dreamers',
 
@@ -117,10 +120,8 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 15,
+    'changeVideoStream': 18, # if this is too low, fps goes down
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
-    'changeVideoStreamSource': 8, # fires on changeVideoStream
-    'clearVideoStreamBuffer': 10, # fires on changeVideoStream, if changeVideoStreamSource does not fire
     'changeColorMap': 20,
     'setBlur': 125,
     'setEdgeDetection': 160,
@@ -158,7 +159,7 @@ textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
 textX = int((options['screenWidth'] - textsize[0]) / 2)
 textY = int((options['screenHeight'] - textsize[1]) / 2)
 cv2.putText(startupImage, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
-text = "loading ...".upper()
+text = "loading ..."
 fontsize = 1
 fontwidth = 1
 textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
@@ -290,10 +291,8 @@ class VideostreamProcessor():
 
             usedTime = time.time() - startTime
             timeLeft = targetTime-usedTime
-            if timeLeft < 0:
-                timeLeft = 0
-
-            print(timeLeft)
+            if timeLeft < 0.05:
+                timeLeft = 0.05
 
             time.sleep(timeLeft)
 
@@ -311,7 +310,6 @@ class VideostreamProcessor():
     def readFrameToQueue(self, stream):
 
         if stream['queue'].full():
-            #print('queue already full')
             return
 
         ret, frame = stream['videoIn'].read()
@@ -357,16 +355,6 @@ class VideostreamProcessor():
         self.streams[streamIndex] = self.loadVideo()
 
 
-    def clearVideostreamBuffer(self, streamIndex):
-
-        if streamIndex == self.index:
-            # don't change current stream, just abort here
-            return
-
-        while not self.streams[streamIndex]['queue'].empty():
-            self.streams[streamIndex]['queue'].get(False)
-
-
     def getNextFrame(self, blocking = False):
 
         if not self.running:
@@ -399,10 +387,7 @@ class VideostreamProcessor():
 
         self.changeVideostreamIndex()
 
-        if probabilityCheck('changeVideoStreamSource'):
-            self.changeVideostreamInput(oldStream)
-        elif probabilityCheck('clearVideoStreamBuffer'):
-            self.clearVideostreamBuffer(oldStream);
+        self.changeVideostreamInput(oldStream)
 
 
 class EffectProcessor():
@@ -433,11 +418,11 @@ class EffectProcessor():
 
         self.active = {
             'colorMap': True,
-            'blur': True,
-            'edgeDetection': True,
+            'blur': False,
+            'edgeDetection': False,
             'flip': True,
-            'sharpening': True,
-            'emboss': True,
+            'sharpening': False,
+            'emboss': False,
             'inverse': True,
             'multiple': True,
         }
@@ -829,9 +814,9 @@ def debugDisplay( im, onset ):
     if options['debugFPS']:
         color = (0,255,0)
 
-        if fpsMeasurement < options['fps']*0.6:
+        if fpsMeasurement < options['fps']*0.8:
             color = (0,0,255)
-        elif fpsMeasurement < options['fps']*0.8:
+        elif fpsMeasurement < options['fps']*0.9:
             color = (0,255,255)
 
         text = 'Main FPS: '+str(int(fpsMeasurement))
@@ -843,12 +828,12 @@ def debugDisplay( im, onset ):
         maxTime = int(targetTime*1000)
 
         color = (0,255,0)
-        if sleep_time < maxTime * 0.2:
+        if sleepTime < maxTime * 0.2:
             color = (0,0,255)
-        elif sleep_time < maxTime*0.4:
+        elif sleepTime < maxTime*0.4:
             color = (0,255,255)
 
-        freePercent = (float(sleep_time)/float(maxTime))
+        freePercent = (float(sleepTime)/float(maxTime))
         if freePercent < 0.1:
             freePercent = 0
 
@@ -878,9 +863,9 @@ def debugDisplay( im, onset ):
             x += w+5
 
         color = (0,255,0)
-        if streamsFpsMeasurement < options['fps']*0.6:
+        if streamsFpsMeasurement < options['fps']*0.8:
             color = (0,0,255)
-        elif streamsFpsMeasurement < options['fps']*0.8:
+        elif streamsFpsMeasurement < options['fps']*0.9:
             color = (0,255,255)
 
         text = 'VideoStreams FPS: '+str(int(streamsFpsMeasurement))
@@ -888,7 +873,7 @@ def debugDisplay( im, onset ):
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 120), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
 
-    if options['debugEffects']:
+    if options['effectsActive'] and options['debugEffects']:
         activeEffects, effectOptions, effectsFpsMeasurement = effects.getInfo()
 
         h = 50
@@ -954,9 +939,9 @@ def debugDisplay( im, onset ):
 
 
         color = (0,255,0)
-        if effectsFpsMeasurement < options['fps']*0.6:
+        if effectsFpsMeasurement < options['fps']*0.8:
             color = (0,0,255)
-        elif effectsFpsMeasurement < options['fps']*0.8:
+        elif effectsFpsMeasurement < options['fps']*0.9:
             color = (0,255,255)
 
         text = 'Effects FPS: '+str(int(effectsFpsMeasurement))
@@ -994,9 +979,9 @@ def debugDisplay( im, onset ):
                 x = 0
 
         color = (0,255,0)
-        if audioFpsMeasurement < options['fps']*0.6:
+        if audioFpsMeasurement < options['fps']*0.8:
             color = (0,0,255)
-        elif audioFpsMeasurement < options['fps']*0.8:
+        elif audioFpsMeasurement < options['fps']*0.9:
             color = (0,255,255)
 
         text = 'Audio FPS: '+str(int(audioFpsMeasurement))
@@ -1028,6 +1013,9 @@ def debugDisplay( im, onset ):
 
 def resizeFrame( frame ):
 
+    if options['skipFrameResize']:
+        return frame
+
     frameHeight, frameWidth, frameChannels = frame.shape
     targetWidth = options['screenWidth']
     targetHeight = int(targetWidth * frameHeight/frameWidth)
@@ -1047,7 +1035,7 @@ def resizeFrame( frame ):
 
 targetTime = 1./options['fps']
 previousTime = currentTime = time.time()
-sleep_time = 0
+sleepTime = 0
 
 fpsMeasurement = options['fps']
 
@@ -1059,15 +1047,18 @@ if options['verbose']:
 
 time.sleep(options['initSleepTime'])
 
-effects = EffectProcessor().start()
+if options['effectsActive']:
+    effects = EffectProcessor().start()
+
 audio = AudioProcessor().start()
 
 time.sleep(0.5)
 
-if options['processEffectsBeforeResize']:
-    effects.put(videostreams.getNextFrame(True))
-else:
-    effects.put(startupImage)
+if options['effectsActive']:
+    if options['processEffectsBeforeResize']:
+        effects.put(videostreams.getNextFrame(True))
+    else:
+        effects.put(startupImage)
 
 frameNumber = 0
 
@@ -1082,7 +1073,7 @@ while True:
 
     lastFrame = frame
 
-    if options['processEffectsBeforeResize']:
+    if options['effectsActive'] and options['processEffectsBeforeResize']:
         nextFrame = frame
         frame = effects.get()
         effects.put(nextFrame)
@@ -1090,7 +1081,7 @@ while True:
     if not options['resizeFrameOnLoad']:
         frame = resizeFrame(frame)
 
-    if not options['processEffectsBeforeResize']:
+    if options['effectsActive'] and not options['processEffectsBeforeResize']:
         nextFrame = frame
         frame = effects.get()
         effects.put(nextFrame)
@@ -1103,11 +1094,12 @@ while True:
 
     usedTime = time.time() - startTime
     timeLeft = targetTime-usedTime
-    sleep_time = int((timeLeft)*1000)
-    if sleep_time < 1:
-        sleep_time = 1
+    sleepTime = int((timeLeft)*1000)
+    sleepTime -= 10 # this is the approximate time that the rest of this loop takes
+    if sleepTime < 1:
+        sleepTime = 1
 
-    key = cv2.waitKey(sleep_time)
+    key = cv2.waitKey(sleepTime)
 
     previousTime, currentTime = currentTime, time.time()
     fps = math.ceil(1./(currentTime-previousTime))
@@ -1169,16 +1161,22 @@ while True:
 
     if onset:
         videostreams.onset()
-        effects.onset()
+
+        if options['effectsActive']:
+            effects.onset()
 
     frameNumber += 1
 
+if options['verbose']:
+    print('shutting down ...')
 
-print('bye!')
+if options['effectsActive']:
+    effects.stop()
 
-effects.stop()
 videostreams.stop()
 audio.stop()
 
 cv2.destroyAllWindows()
+
+print('bye!')
 
