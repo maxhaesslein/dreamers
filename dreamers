@@ -93,8 +93,6 @@ options = {
     'videostreamCount': 16,
     'videostreamMaxQueueSize': 20,
 
-    'videoProcessorTimeout': 0.01,
-
 
     'sensitivity': 0.7, # 0.1 - 1.0; lower means slower, higher means faster
 
@@ -275,8 +273,11 @@ class VideostreamProcessor():
     def update(self):
 
         previousTime = currentTime = time.time()
+        targetTime = 1./options['fps']
 
         while self.running:
+
+            startTime = time.time()
 
             # first, fill up current stream
             currentStream = self.streams[self.index]
@@ -287,7 +288,14 @@ class VideostreamProcessor():
             for stream in self.streams:
                 self.readFrameToQueue(stream)
 
-            time.sleep(options['videoProcessorTimeout'])
+            usedTime = time.time() - startTime
+            timeLeft = targetTime-usedTime
+            if timeLeft < 0:
+                timeLeft = 0
+
+            print(timeLeft)
+
+            time.sleep(timeLeft)
 
             previousTime, currentTime = currentTime, time.time()
             fps = math.ceil(1./(currentTime-previousTime))
@@ -424,7 +432,7 @@ class EffectProcessor():
         }
 
         self.active = {
-            'colorMap': False,
+            'colorMap': True,
             'blur': True,
             'edgeDetection': True,
             'flip': True,
@@ -739,7 +747,6 @@ class AudioProcessor:
     def update(self):
 
         previousTime = currentTime = time.time()
-
         targetTime = 1./options['fps']
 
         while self.running:
@@ -774,18 +781,16 @@ class AudioProcessor:
             if self.onset:
                 self.queue.put(True)
 
-
-            previousTime, currentTime = currentTime, time.time()
-            fps = math.ceil(1./(currentTime-previousTime))
-            self.fpsMeasurement = (self.fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
-
-
             usedTime = time.time() - startTime
             timeLeft = targetTime-usedTime
             if timeLeft < 0:
                 timeLeft = 0
 
             time.sleep(timeLeft)
+
+            previousTime, currentTime = currentTime, time.time()
+            fps = math.ceil(1./(currentTime-previousTime))
+            self.fpsMeasurement = (self.fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
 
 
     def getInfo(self):
@@ -966,7 +971,7 @@ def debugDisplay( im, onset ):
         if index < 0:
             index = options['fps']-1
 
-        w = int(options['screenWidth']/len(data))
+        w = math.ceil(options['screenWidth']/len(data))
         x = options['screenWidth']-w
         y = int(options['screenHeight'] / 2)
 
