@@ -328,8 +328,8 @@ class VideostreamProcessor():
                 randomIndex = 0
             if randomIndex == self.index:
                 continue
-            # find a stream that has at least 5 frames in its queue:
             if self.streams[randomIndex]['queue'].qsize() >= 5:
+                # find a stream that has at least 5 frames in its queue, then break
                 break
 
         self.index = randomIndex
@@ -365,7 +365,8 @@ class VideostreamProcessor():
             return false
 
         if self.streams[self.index]['queue'].empty():
-            return False
+            # force switch to other stream
+            self.changeVideostreamIndex()
 
         frame = self.streams[self.index]['queue'].get(blocking)
 
@@ -698,6 +699,7 @@ class AudioProcessor:
 
         self.running = True
         self.queue = Queue()
+        self.bpm = 0
 
         self.fpsMeasurement = options['fps']
 
@@ -756,7 +758,9 @@ class AudioProcessor:
             if self.tempoDetection(signal):
                 self.onset = True
 
-            # current bpm: print(self.tempoDetection.get_bpm())
+            bpm = self.tempoDetection.get_bpm()
+            if bpm > 0:
+                self.bpm = bpm
 
             peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
@@ -785,7 +789,7 @@ class AudioProcessor:
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement
+        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement, self.bpm
 
 
     def isOnset(self):
@@ -957,7 +961,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index, audioFpsMeasurement = audio.getInfo()
+        data, onsetData, index, audioFpsMeasurement, bpm = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -994,6 +998,9 @@ def debugDisplay( im, onset ):
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 90), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
+        text = 'BPM: '+str(int(bpm))
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 150), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
 
     if options['debugOnset']:
 
@@ -1053,7 +1060,7 @@ audio = AudioProcessor().start()
 time.sleep(0.5)
 
 if options['processEffectsBeforeResize']:
-    effects.put(videostreams.getNextFrame())
+    effects.put(videostreams.getNextFrame(True))
 else:
     effects.put(startupImage)
 
