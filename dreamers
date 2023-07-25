@@ -11,7 +11,7 @@
 # sudo apt install xserver-xorg xinit
 #
 # start with:
-# startx /home/mh/dreamers/dreamers
+# startx $HOME/dreamers/dreamers
 
 # autostart happens in ~/.config/systemd/user/dreamers.service
 

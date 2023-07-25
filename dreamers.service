@@ -3,7 +3,7 @@ Description=The Dreamers
 
 [Service]
 Environment=DISPLAY=:0
-ExecStart=/home/mh/dreamers/start
+ExecStart=%h/dreamers/start
 Restart=always
 RestartSec=5s
 KillMode=process
