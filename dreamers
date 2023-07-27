@@ -89,9 +89,9 @@ options = {
 
     'effectsActive': True,
     'skipFrameResize': True,
-    'processEffectsBeforeResize': False,
+    'resizeFrameBeforeEffect': True,
     'resizeFrameOnLoad': False,
-    'effectsMultithreaded': False,
+    'effectsMultithreaded': True,
 
 
     'videostreamCount': 20,
@@ -813,6 +813,8 @@ def probabilityCheck( key ):
 
 def debugDisplay( im, onset ):
 
+    textX = 30
+
     if options['debugFPS']:
         color = (0,255,0)
 
@@ -823,7 +825,93 @@ def debugDisplay( im, onset ):
 
         text = 'Main FPS: '+str(int(fpsMeasurement))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 30), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+
+        textX += 30
+
+
+    if options['effectsActive'] and options['debugEffects']:
+        activeEffects, effectOptions, effectsFpsMeasurement = effects.getInfo()
+
+        h = 50
+        x = 10
+        y = 10
+
+        for key, val in effectOptions.items():
+            text = key
+
+            if activeEffects[key]:
+                color = (255,255,255)
+            else:
+                color = (0,0,0)
+                val = 0
+
+            maxVal = 1
+
+            w = 20
+            tX = x
+
+            if key == 'colorMap':
+                maxVal = len(options['colorMaps'])
+                text = 'col'
+            elif key == 'blur':
+                maxVal = maxVals['blur']
+                if not activeEffects[key]:
+                    val = (0,0)
+
+                w = 15
+
+                filledPercent = val[0]/maxVal
+                drawDebugRect( im, x, y, w, h, filledPercent, color )
+                x += w+2
+                tX = x-int(w/2)
+                val = val[1]
+
+            elif key == 'edgeDetection':
+                maxVal = maxVals['edgeDetection']
+                text = 'edg'
+            elif key == 'sharpening':
+                maxVal = maxVals['sharpening']
+                text = 'shrp'
+            elif key == 'emboss':
+                maxVal = maxVals['emboss']
+                text = 'emb'
+            elif key == 'inverse':
+                text = 'inv'
+            elif key == 'multiple':
+                val -= 1
+                if val < 0:
+                    val = 0
+                maxVal = 5
+                text = 'mult'
+
+            filledPercent = val/maxVal
+
+            drawDebugRect( im, x, y, w, h, filledPercent, color )
+            textsize = cv2.getTextSize(text, options['debugFont'], 0.4, 1)[0]
+            tX += int(w/2)-int(textsize[0]/2)
+            cv2.putText( im, text, (tX, y+h+8), options['debugFont'], 0.4, color, 1, cv2.LINE_AA )
+
+            x += w+5
+
+
+        if options['effectsMultithreaded']:
+            color = (0,255,0)
+            if effectsFpsMeasurement < options['fps']*0.8:
+                color = (0,0,255)
+            elif effectsFpsMeasurement < options['fps']*0.9:
+                color = (0,255,255)
+            effectsFpsMeasurement = str(int(effectsFpsMeasurement))
+        else:
+            color = (255,255,255)
+            effectsFpsMeasurement = '**'
+
+        text = 'Effects FPS: '+effectsFpsMeasurement
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+
+        textX += 30
+
 
     if options['debugTiming']:
 
@@ -872,88 +960,9 @@ def debugDisplay( im, onset ):
 
         text = 'VideoStreams FPS: '+str(int(streamsFpsMeasurement))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 120), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
-
-    if options['effectsActive'] and options['debugEffects']:
-        activeEffects, effectOptions, effectsFpsMeasurement = effects.getInfo()
-
-        h = 50
-        x = 10
-        y = 10
-
-        for key, val in effectOptions.items():
-            text = key
-
-            if activeEffects[key]:
-                color = (255,255,255)
-            else:
-                color = (0,0,0)
-                val = 0
-
-            maxVal = 1
-
-            w = 20
-            textX = x
-
-            if key == 'colorMap':
-                maxVal = len(options['colorMaps'])
-                text = 'col'
-            elif key == 'blur':
-                maxVal = maxVals['blur']
-                if not activeEffects[key]:
-                    val = (0,0)
-
-                w = 15
-
-                filledPercent = val[0]/maxVal
-                drawDebugRect( im, x, y, w, h, filledPercent, color )
-                x += w+2
-                textX = x-int(w/2)
-                val = val[1]
-
-            elif key == 'edgeDetection':
-                maxVal = maxVals['edgeDetection']
-                text = 'edg'
-            elif key == 'sharpening':
-                maxVal = maxVals['sharpening']
-                text = 'shrp'
-            elif key == 'emboss':
-                maxVal = maxVals['emboss']
-                text = 'emb'
-            elif key == 'inverse':
-                text = 'inv'
-            elif key == 'multiple':
-                val -= 1
-                if val < 0:
-                    val = 0
-                maxVal = 5
-                text = 'mult'
-
-            filledPercent = val/maxVal
-
-            drawDebugRect( im, x, y, w, h, filledPercent, color )
-            textsize = cv2.getTextSize(text, options['debugFont'], 0.4, 1)[0]
-            textX += int(w/2)-int(textsize[0]/2)
-            cv2.putText( im, text, (textX, y+h+8), options['debugFont'], 0.4, color, 1, cv2.LINE_AA )
-
-            x += w+5
-
-
-        if options['effectsMultithreaded']:
-            color = (0,255,0)
-            if effectsFpsMeasurement < options['fps']*0.8:
-                color = (0,0,255)
-            elif effectsFpsMeasurement < options['fps']*0.9:
-                color = (0,255,255)
-            effectsFpsMeasurement = str(int(effectsFpsMeasurement))
-        else:
-            color = (255,255,255)
-            effectsFpsMeasurement = '**'
-
-        text = 'Effects FPS: '+effectsFpsMeasurement
-        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 60), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        textX += 30
 
 
     if options['debugAudio']:
@@ -993,11 +1002,16 @@ def debugDisplay( im, onset ):
 
         text = 'Audio FPS: '+str(int(audioFpsMeasurement))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 90), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+
+        textX += 30
 
         text = 'BPM: '+str(int(bpm))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 150), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+
+        textX += 30
+
 
     if options['debugOnset']:
 
@@ -1064,7 +1078,7 @@ audio = AudioProcessor().start()
 time.sleep(0.5)
 
 if options['effectsActive'] and options['effectsMultithreaded']:
-    if options['processEffectsBeforeResize']:
+    if not options['resizeFrameBeforeEffect']:
         effects.put(videostreams.getNextFrame(True))
     else:
         effects.put(startupImage)
@@ -1082,24 +1096,19 @@ while True:
 
     lastFrame = frame
 
-    if options['effectsActive'] and options['processEffectsBeforeResize']:
-        if options['effectsMultithreaded']:
-            nextFrame = frame
-            frame = effects.get()
-            effects.put(nextFrame)
-        else:
-            frame = effects.apply(frame)
-
-    if not options['resizeFrameOnLoad']:
+    if not options['resizeFrameOnLoad'] and options['resizeFrameBeforeEffect']:
         frame = resizeFrame(frame)
 
-    if options['effectsActive'] and not options['processEffectsBeforeResize']:
+    if options['effectsActive']:
         if options['effectsMultithreaded']:
             nextFrame = frame
             frame = effects.get()
             effects.put(nextFrame)
         else:
             frame = effects.apply(frame)
+
+    if not options['resizeFrameOnLoad'] and not options['resizeFrameBeforeEffect']:
+        frame = resizeFrame(frame)
 
     onset = audio.isOnset()
 
