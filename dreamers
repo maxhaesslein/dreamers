@@ -22,8 +22,7 @@ print("")
 print("    THE DREAMERS v.4")
 print("")
 #print("    q: quit and shutdown")
-#print("    e: exit to console")
-print("    esc: exit")
+print("    esc: exit to console")
 print("  space: fake onset")
 print('')
 print("      1: toggle effect 'colorMap'")
@@ -44,10 +43,8 @@ print("      t: toggle audio debug display")
 print("      z: toggle onset debug display")
 print("      d: toggle all debug displays")
 print('')
-#print("    ,: decrease sensitivity")
-#print("    .: increase sensitivity")
-#print("    n: decrease speed")
-#print("    m: increase speed")
+print("      ,: decrease sensitivity")
+print("      .: increase sensitivity")
 #print("    s: sharpening overlay")
 #print("    p: pause rendering")
 #print("    v: verbose level")
@@ -1183,6 +1180,18 @@ while True:
         options['debugAudio'] = newBool
         options['debugOnset'] = newBool
 
+    elif key&0xFF == ord(','):
+        options['sensitivity'] -= 0.05
+        if options['sensitivity'] < 0:
+            options['sensitivity'] = 0.0
+        if options['verbose']:
+            print('set sensitivity to '+str(options['sensitivity']))
+    elif key&0xFF == ord('.'):
+        options['sensitivity'] += 0.05
+        if options['sensitivity'] > 1:
+            options['sensitivity'] = 1.0
+        if options['verbose']:
+            print('set sensitivity to '+str(options['sensitivity']))
 
     if onset:
         videostreams.onset()
