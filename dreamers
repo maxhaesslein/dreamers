@@ -88,9 +88,9 @@ options = {
 
 
     'effectsActive': True,
-    'skipFrameResize': True,
+    'frameResize': False,
+    'resizeFrameOnLoad': True,
     'resizeFrameBeforeEffect': True,
-    'resizeFrameOnLoad': False,
     'effectsMultithreaded': True,
 
 
@@ -1034,7 +1034,7 @@ def debugDisplay( im, onset ):
 
 def resizeFrame( frame ):
 
-    if options['skipFrameResize']:
+    if not options['frameResize']:
         return frame
 
     frameHeight, frameWidth, frameChannels = frame.shape
@@ -1085,6 +1085,8 @@ if options['effectsActive'] and options['effectsMultithreaded']:
 
 frameNumber = 0
 
+additionalFrameTime = 0
+
 # main loop
 while True:
 
@@ -1118,10 +1120,12 @@ while True:
 
     usedTime = time.time() - startTime
     timeLeft = targetTime-usedTime
+    timeLeft -= additionalFrameTime # this is the approximate time that the rest of this loop takes
     sleepTime = int((timeLeft)*1000)
-    sleepTime -= 10 # this is the approximate time that the rest of this loop takes
     if sleepTime < 1:
         sleepTime = 1
+
+    midTime = time.time()
 
     key = cv2.waitKey(sleepTime)
 
@@ -1190,6 +1194,9 @@ while True:
             effects.onset()
 
     frameNumber += 1
+
+    additionalFrameTime = time.time() - midTime
+
 
 if options['verbose']:
     print('shutting down ...')
