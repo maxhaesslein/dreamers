@@ -83,14 +83,15 @@ options = {
     'fps': 25,
     'fpsSmoothing':  0.9, # this smoothes only the fps _debug display_, NOT the real fps
 
-    'screenWidth': 960, # 1280
-    'screenHeight': 540, # 720
+    'screenWidth': 1280,
+    'screenHeight': 720,
 
 
     'effectsActive': True,
-    'skipFrameResize': False,
+    'skipFrameResize': True,
     'processEffectsBeforeResize': False,
     'resizeFrameOnLoad': False,
+    'effectsMultithreaded': False,
 
 
     'videostreamCount': 20,
@@ -108,7 +109,7 @@ options = {
 
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
-    'audioDevice': 1,
+    'audioDevice': 2,
     'audioOnsetMethod': 'specflux', # see https://aubio.org/doc/latest/specdesc_8h.html
     'audioDisplayScaling': 10000,
 
@@ -938,13 +939,18 @@ def debugDisplay( im, onset ):
             x += w+5
 
 
-        color = (0,255,0)
-        if effectsFpsMeasurement < options['fps']*0.8:
-            color = (0,0,255)
-        elif effectsFpsMeasurement < options['fps']*0.9:
-            color = (0,255,255)
+        if options['effectsMultithreaded']:
+            color = (0,255,0)
+            if effectsFpsMeasurement < options['fps']*0.8:
+                color = (0,0,255)
+            elif effectsFpsMeasurement < options['fps']*0.9:
+                color = (0,255,255)
+            effectsFpsMeasurement = str(int(effectsFpsMeasurement))
+        else:
+            color = (255,255,255)
+            effectsFpsMeasurement = '**'
 
-        text = 'Effects FPS: '+str(int(effectsFpsMeasurement))
+        text = 'Effects FPS: '+effectsFpsMeasurement
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, 60), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
@@ -1048,13 +1054,15 @@ if options['verbose']:
 time.sleep(options['initSleepTime'])
 
 if options['effectsActive']:
-    effects = EffectProcessor().start()
+    effects = EffectProcessor()
+    if options['effectsMultithreaded']:
+        effects.start()
 
 audio = AudioProcessor().start()
 
 time.sleep(0.5)
 
-if options['effectsActive']:
+if options['effectsActive'] and options['effectsMultithreaded']:
     if options['processEffectsBeforeResize']:
         effects.put(videostreams.getNextFrame(True))
     else:
@@ -1074,17 +1082,23 @@ while True:
     lastFrame = frame
 
     if options['effectsActive'] and options['processEffectsBeforeResize']:
-        nextFrame = frame
-        frame = effects.get()
-        effects.put(nextFrame)
+        if options['effectsMultithreaded']:
+            nextFrame = frame
+            frame = effects.get()
+            effects.put(nextFrame)
+        else:
+            frame = effects.apply(frame)
 
     if not options['resizeFrameOnLoad']:
         frame = resizeFrame(frame)
 
-    if options['effectsActive'] and not options['processEffectsBeforeResize']:
-        nextFrame = frame
-        frame = effects.get()
-        effects.put(nextFrame)
+    if options['effectsActive'] and not options['processEffectsBeforeResize'] and options['effectsMultithreaded']:
+        if options['effectsMultithreaded']:
+            nextFrame = frame
+            frame = effects.get()
+            effects.put(nextFrame)
+        else:
+            frame = effect.apply(frame)
 
     onset = audio.isOnset()
 
@@ -1170,7 +1184,7 @@ while True:
 if options['verbose']:
     print('shutting down ...')
 
-if options['effectsActive']:
+if options['effectsActive'] and options['effectsMultithreaded']:
     effects.stop()
 
 videostreams.stop()
