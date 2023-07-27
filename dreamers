@@ -81,7 +81,7 @@ options = {
 
 
     'fps': 25,
-    'fpsSmoothing':  0.9, # this smoothes only the fps _debug display_, NOT the real fps
+    'fpsSmoothing':  0.6, # this smoothes only the fps _debug display_, NOT the real fps
 
     'screenWidth': 1280,
     'screenHeight': 720,
@@ -89,7 +89,7 @@ options = {
 
     'effectsActive': True,
     'frameResize': False,
-    'resizeFrameOnLoad': True,
+    'resizeFrameOnLoad': False,
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
@@ -222,7 +222,9 @@ def drawDebugRect( im, x, y, w, h, p, c ):
 
     lineWidth = 1
 
-    if p > 1.0:
+    if p < 0.0:
+        p = 0.0
+    elif p > 1.0:
         p = 1.0
 
     filledHeight = int(h * p)
@@ -915,19 +917,15 @@ def debugDisplay( im, onset ):
 
     if options['debugTiming']:
 
-        maxTime = int(targetTime*1000)
+        frameTime = usedTime + additionalFrameTime
 
         color = (0,255,0)
-        if sleepTime < maxTime * 0.2:
+        if frameTime > targetTime * 0.95:
             color = (0,0,255)
-        elif sleepTime < maxTime*0.4:
+        elif frameTime > targetTime*0.8:
             color = (0,255,255)
 
-        freePercent = (float(sleepTime)/float(maxTime))
-        if freePercent < 0.1:
-            freePercent = 0
-
-        filledPercent = 1-freePercent
+        filledPercent = float(frameTime)/float(targetTime)
 
         w = 30
         h = 100
@@ -1056,7 +1054,7 @@ def resizeFrame( frame ):
 
 targetTime = 1./options['fps']
 previousTime = currentTime = time.time()
-sleepTime = 0
+usedTime = 0
 
 fpsMeasurement = options['fps']
 
@@ -1084,7 +1082,6 @@ if options['effectsActive'] and options['effectsMultithreaded']:
         effects.put(startupImage)
 
 frameNumber = 0
-
 additionalFrameTime = 0
 
 # main loop
@@ -1120,17 +1117,17 @@ while True:
 
     usedTime = time.time() - startTime
     timeLeft = targetTime-usedTime
-    timeLeft -= additionalFrameTime # this is the approximate time that the rest of this loop takes
-    sleepTime = int((timeLeft)*1000)
+    sleepTime = timeLeft - additionalFrameTime # this is the approximate time that the rest of this loop takes
+    sleepTime = int(sleepTime*1000)
     if sleepTime < 1:
         sleepTime = 1
 
-    midTime = time.time()
-
     key = cv2.waitKey(sleepTime)
 
+    midTime = time.time()
+
     previousTime, currentTime = currentTime, time.time()
-    fps = math.ceil(1./(currentTime-previousTime))
+    fps = round(1./(currentTime-previousTime))
     fpsMeasurement = (fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
 
     if key == 27: # escape
