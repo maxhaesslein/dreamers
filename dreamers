@@ -106,7 +106,7 @@ options = {
 
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
-    'audioDevice': 2,
+    'audioDevice': 'auto',
     'audioOnsetMethod': 'specflux', # see https://aubio.org/doc/latest/specdesc_8h.html
     'audioDisplayScaling': 10000,
 
@@ -175,6 +175,9 @@ if options['verbose']:
     for i in range(pa.get_device_count()):
         dev = pa.get_device_info_by_index(i)
         print(i,dev['name'],dev['maxInputChannels'])
+        if options['audioDevice'] == 'auto' and dev['maxInputChannels'] > 0:
+            options['audioDevice'] = i
+            print('  automatically set audio device to '+str(i))
 if pa.get_device_count() < options['audioDevice']:
     print('audio device index is out of range (found '+str(pa.get_device_count())+' audio devices, requested #'+str(options['audioDevice'])+')')
     sys.exit()
