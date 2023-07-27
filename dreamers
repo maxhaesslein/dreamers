@@ -184,6 +184,7 @@ if pa.get_device_count() < options['audioDevice']:
 audioDevice = pa.get_device_info_by_index(options['audioDevice'])
 if audioDevice['maxInputChannels'] <= 0:
     print('audio device has no input channels! aborting')
+    print('(use "arecord -l" to check available devices)')
     sys.exit()
 audioOptions = {
     'deviceIndex': audioDevice['index'],
@@ -1092,13 +1093,13 @@ while True:
     if not options['resizeFrameOnLoad']:
         frame = resizeFrame(frame)
 
-    if options['effectsActive'] and not options['processEffectsBeforeResize'] and options['effectsMultithreaded']:
+    if options['effectsActive'] and not options['processEffectsBeforeResize']:
         if options['effectsMultithreaded']:
             nextFrame = frame
             frame = effects.get()
             effects.put(nextFrame)
         else:
-            frame = effect.apply(frame)
+            frame = effects.apply(frame)
 
     onset = audio.isOnset()
 
