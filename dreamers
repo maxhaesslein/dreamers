@@ -41,6 +41,7 @@ print("      e: toggle videostreams debug display")
 print("      r: toggle effects debug display")
 print("      t: toggle audio debug display")
 print("      z: toggle onset debug display")
+print("      u: toggle bpm debug display")
 print("      d: toggle all debug displays")
 print('')
 print("      ,: decrease sensitivity")
@@ -73,6 +74,7 @@ options = {
     'debugEffects': True,
     'debugAudio': True,
     'debugOnset': True,
+    'debugBpm': True,
 
     'verbose': True,
 
@@ -1023,6 +1025,17 @@ def debugDisplay( im, onset ):
         drawDebugRect( im, x, y, w, h, filledPercent, color )
 
 
+    if options['debugBpm']:
+
+        bpm = np.count_nonzero(beatList)
+
+        text = '~BPM: '+str(bpm)
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+
+        textX += 30
+
+
     return im
 
 
@@ -1080,6 +1093,9 @@ if options['effectsActive'] and options['effectsMultithreaded']:
 frameNumber = 0
 additionalFrameTime = 0
 
+frameCountIn1Minute = options['fps']*60
+beatList = np.zeros(frameCountIn1Minute)
+
 # main loop
 while True:
 
@@ -1106,6 +1122,13 @@ while True:
         frame = resizeFrame(frame)
 
     onset = audio.isOnset()
+
+    beatListIndex = frameNumber%frameCountIn1Minute
+    if onset:
+        beatList[beatListIndex] = 1
+    else:
+        beatList[beatListIndex] = 0
+
 
     frame = debugDisplay(frame, onset)
 
@@ -1169,6 +1192,8 @@ while True:
         options['debugAudio'] = not options['debugAudio']
     elif key&0xFF == ord('z'):
         options['debugOnset'] = not options['debugOnset']
+    elif key&0xFF == ord('u'):
+        options['debugBpm'] = not options['debugBpm']
 
     elif key&0xFF == ord('d'):
         newBool = not options['debugFPS']
