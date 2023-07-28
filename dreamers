@@ -42,6 +42,7 @@ print("      r: toggle effects debug display")
 print("      t: toggle audio debug display")
 print("      z: toggle onset debug display")
 print("      u: toggle bpm debug display")
+print("      i: toggle loudness debug display")
 print("      d: toggle all debug displays")
 print('')
 print("      ,: decrease sensitivity")
@@ -75,6 +76,7 @@ options = {
     'debugAudio': False,
     'debugOnset': False,
     'debugBpm': True,
+    'debugLoudness': True,
 
     'verbose': True,
 
@@ -720,6 +722,7 @@ class AudioProcessor:
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
+        self.loudness = 0
 
         win_s = audioOptions['bufferSize']*2
         hop_s = int(win_s // 2)
@@ -768,15 +771,14 @@ class AudioProcessor:
             if tempo:
                 onset = True
 
-            if options['debugAudio']:
-                peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+            peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
-                self.peakBuffer[self.peakBufferIndex] = peak
-                self.peakBufferOnset[self.peakBufferIndex] = onset
+            self.peakBuffer[self.peakBufferIndex] = peak
+            self.peakBufferOnset[self.peakBufferIndex] = onset
 
-                self.peakBufferIndex += 1
-                if self.peakBufferIndex >= len(self.peakBuffer):
-                    self.peakBufferIndex = 0
+            self.peakBufferIndex += 1
+            if self.peakBufferIndex >= len(self.peakBuffer):
+                self.peakBufferIndex = 0
 
 
             if onset:
@@ -796,6 +798,10 @@ class AudioProcessor:
 
     def getInfo(self):
         return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement
+
+
+    def getLoudness(self):
+        return np.mean(self.peakBuffer)
 
 
     def isOnset(self):
@@ -1037,7 +1043,25 @@ def debugDisplay( im, onset ):
 
         bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
 
-        text = '~BPM: '+str(bpm)
+        text = 'BPM: '+str(bpm)
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+
+        textX += 30
+
+
+    if options['debugLoudness']:
+
+        loudnessInt = int(loudness)
+        averageLoudnessInt = int(averageLoudness)
+
+        sep = '='
+        if loudnessInt < averageLoudnessInt:
+            sep = '<'
+        elif loudnessInt > averageLoudnessInt:
+            sep = '>'
+
+        text = 'Loudness: '+str(loudnessInt)+' '+sep+' '+str(averageLoudnessInt)
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
 
@@ -1116,6 +1140,11 @@ additionalFrameTime = 0
 frameCountIn30Seconds = options['fps']*30
 beatList = np.zeros(frameCountIn30Seconds)
 
+loudness = 0
+averageLoudness = 0
+frameCountIn10Seconds = options['fps']*10
+loudnessList = np.zeros(frameCountIn10Seconds)
+
 messages = []
 
 # main loop
@@ -1144,12 +1173,17 @@ while True:
         frame = resizeFrame(frame)
 
     onset = audio.isOnset()
+    loudness = audio.getLoudness()
 
-    beatListIndex = frameNumber%frameCountIn30Seconds
+    listIndex = frameNumber%frameCountIn30Seconds
     if onset:
-        beatList[beatListIndex] = 1
+        beatList[listIndex] = 1
     else:
-        beatList[beatListIndex] = 0
+        beatList[listIndex] = 0
+
+    loudnessList[frameNumber%frameCountIn10Seconds] = loudness
+
+    averageLoudness = np.mean(loudnessList)
 
 
     frame = debugDisplay(frame, onset)
@@ -1242,6 +1276,9 @@ while True:
     elif key&0xFF == ord('u'):
         messages.append('toggle bpm debug display')
         options['debugBpm'] = not options['debugBpm']
+    elif key&0xFF == ord('i'):
+        messages.append('toggle loudness debug display')
+        options['debugLoudness'] = not options['debugLoudness']
 
     elif key&0xFF == ord('d'):
         messages.append('toggle all debug displays')
@@ -1253,6 +1290,7 @@ while True:
         options['debugAudio'] = newBool
         options['debugOnset'] = newBool
         options['debugBpm'] = newBool
+        options['debugLoudness'] = newBool
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
