@@ -90,6 +90,8 @@ options = {
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
+    'grayscale': False,
+
 
     'videostreamCount': 20,
     'videostreamMaxQueueSize': 20,
@@ -333,6 +335,10 @@ class VideostreamProcessor():
             # no more frames left, loop video
             stream['videoIn'].set(cv2.CAP_PROP_POS_FRAMES, 0)
             return
+
+        if options['grayscale']:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
         if options['resizeFrameOnLoad']:
             frame = resizeFrame(frame)
@@ -746,12 +752,10 @@ class AudioProcessor:
             onset = False
             onsetDet = self.onsetDetection(signal)
             if onsetDet:
-                print('    onset: ',onsetDet)
                 onset = True
 
             tempo = self.tempoDetection(signal)
             if tempo:
-                print('    tempo: ',tempo)
                 onset = True
 
             if options['debugAudio']:
