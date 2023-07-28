@@ -68,12 +68,12 @@ import aubio
 
 options = {
 
-    'debugFPS': True,
-    'debugTiming': True,
-    'debugStreams': True,
-    'debugEffects': True,
-    'debugAudio': True,
-    'debugOnset': True,
+    'debugFPS': False,
+    'debugTiming': False,
+    'debugStreams': False,
+    'debugEffects': False,
+    'debugAudio': False,
+    'debugOnset': False,
     'debugBpm': True,
 
     'verbose': True,
@@ -133,7 +133,8 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 18, # if this is too low, fps goes down
+    'changeVideoStream': 0, # DEBUG
+    #'changeVideoStream': 18, # if this is too low, fps goes down
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -144,7 +145,7 @@ probabilities = {
     'setEmboss': 125,
     'setInverse': 80,
     'unsetInverse': 12,
-    'setMultiple': 330,
+    'setMultiple': 100, #330,
     'unsetMultiple': 60
 }
 
@@ -520,26 +521,33 @@ class EffectProcessor():
 
         # show frame multiple times
         if self.active['multiple'] and self.options['multiple']:
+
             if self.options['multiple'] == 2:
                 frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # resize two half the size
                 frame = np.concatenate((frame, frame), axis=0) # stack vertically
                 frame = np.concatenate((frame, frame), axis=1) # stack horizontally
+
             elif self.options['multiple'] == 3:
-                frame = cv2.resize(frame, (0,0), fx=0.333, fy=0.333)
+                frame = cv2.resize(frame, (0,0), fx=0.334, fy=0.334)
                 frame = np.concatenate((frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame), axis=1)
+                frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
+
             elif self.options['multiple'] == 4:
                 frame = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
                 frame = np.concatenate((frame, frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame, frame), axis=1)
+
             elif self.options['multiple'] == 5:
                 frame = cv2.resize(frame, (0,0), fx=0.2, fy=0.2)
                 frame = np.concatenate((frame, frame, frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame, frame, frame), axis=1)
+
             elif self.options['multiple'] == 6:
                 frame = cv2.resize(frame, (0,0), fx=0.167, fy=0.167)
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
+                frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         # tint image
         if self.active['colorMap'] and self.options['colorMap'] > 0:
@@ -1027,7 +1035,7 @@ def debugDisplay( im, onset ):
 
     if options['debugBpm']:
 
-        bpm = np.count_nonzero(beatList)
+        bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
 
         text = '~BPM: '+str(bpm)
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
@@ -1105,8 +1113,8 @@ if options['effectsActive'] and options['effectsMultithreaded']:
 frameNumber = 0
 additionalFrameTime = 0
 
-frameCountIn1Minute = options['fps']*60
-beatList = np.zeros(frameCountIn1Minute)
+frameCountIn30Seconds = options['fps']*30
+beatList = np.zeros(frameCountIn30Seconds)
 
 messages = []
 
@@ -1137,7 +1145,7 @@ while True:
 
     onset = audio.isOnset()
 
-    beatListIndex = frameNumber%frameCountIn1Minute
+    beatListIndex = frameNumber%frameCountIn30Seconds
     if onset:
         beatList[beatListIndex] = 1
     else:
@@ -1244,6 +1252,7 @@ while True:
         options['debugEffects'] = newBool
         options['debugAudio'] = newBool
         options['debugOnset'] = newBool
+        options['debugBpm'] = newBool
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
