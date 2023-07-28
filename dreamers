@@ -1041,9 +1041,16 @@ def debugDisplay( im, onset ):
 
     if options['debugBpm']:
 
-        bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
+        bpmInt = int(bpm)
+        averageBpmInt = int(averageBpm)
 
-        text = 'BPM: '+str(bpm)
+        sep = '='
+        if bpmInt < averageBpmInt:
+            sep = '<'
+        elif bpmInt > averageBpmInt:
+            sep = '>'
+
+        text = 'BPM: '+str(bpmInt)+' '+sep+' '+str(averageBpmInt)
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
 
@@ -1138,11 +1145,15 @@ frameNumber = 0
 additionalFrameTime = 0
 
 frameCountIn30Seconds = options['fps']*30
+frameCountIn10Seconds = options['fps']*10
+
 beatList = np.zeros(frameCountIn30Seconds)
+bpm = 0
+averageBpm = 0
+bpmList = np.zeros(frameCountIn10Seconds)
 
 loudness = 0
 averageLoudness = 0
-frameCountIn10Seconds = options['fps']*10
 loudnessList = np.zeros(frameCountIn10Seconds)
 
 messages = []
@@ -1175,15 +1186,20 @@ while True:
     onset = audio.isOnset()
     loudness = audio.getLoudness()
 
-    listIndex = frameNumber%frameCountIn30Seconds
+    listIndex30 = frameNumber%frameCountIn30Seconds
     if onset:
-        beatList[listIndex] = 1
+        beatList[listIndex30] = 1
     else:
-        beatList[listIndex] = 0
+        beatList[listIndex30] = 0
 
-    loudnessList[frameNumber%frameCountIn10Seconds] = loudness
+    bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
+
+    listIndex10 = frameNumber%frameCountIn10Seconds
+    bpmList[listIndex10] = bpm
+    loudnessList[listIndex10] = loudness
 
     averageLoudness = np.mean(loudnessList)
+    averageBpm = np.mean(bpmList)
 
 
     frame = debugDisplay(frame, onset)
