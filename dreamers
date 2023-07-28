@@ -295,9 +295,11 @@ class VideostreamProcessor():
 
             startTime = time.time()
 
-            # first, fill up current stream
+            # first, load 2 frames of the current stream
             currentStream = self.streams[self.index]
-            while not currentStream['queue'].full():
+            for i in range(2):
+                if currentStream['queue'].full():
+                    break
                 self.readFrameToQueue(currentStream)
 
             # then fill up rest:
