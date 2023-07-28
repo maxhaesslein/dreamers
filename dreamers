@@ -102,8 +102,6 @@ options = {
     'videoExtension': 'mp4',
     'videoPath': 'footage/',
 
-    'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
-
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
     'audioDevice': 'auto',
@@ -111,6 +109,19 @@ options = {
     'audioDisplayScaling': 10000,
 
     'initSleepTime': 5, # in seconds, sleep time after loading videostreams before starting main loop
+
+
+    'effectsActiveList': {
+        'colorMap': False,
+        'blur': False,
+        'edgeDetection': False,
+        'flip': False,
+        'sharpening': False,
+        'emboss': False,
+        'inverse': False,
+        'multiple': True,
+    },
+    'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 
 }
 
@@ -295,10 +306,8 @@ class VideostreamProcessor():
 
             usedTime = time.time() - startTime
             timeLeft = targetTime-usedTime
-            if timeLeft < 0.05:
-                timeLeft = 0.05
-
-            time.sleep(timeLeft)
+            if timeLeft > 0.0:
+                time.sleep(timeLeft)
 
             previousTime, currentTime = currentTime, time.time()
             fps = math.ceil(1./(currentTime-previousTime))
@@ -420,16 +429,7 @@ class EffectProcessor():
             'multiple': 0,
         }
 
-        self.active = {
-            'colorMap': True,
-            'blur': False,
-            'edgeDetection': False,
-            'flip': True,
-            'sharpening': False,
-            'emboss': False,
-            'inverse': True,
-            'multiple': True,
-        }
+        self.active = options['effectsActiveList']
 
         self.colorMaps = []
         for colorMap in options['colorMaps']:
