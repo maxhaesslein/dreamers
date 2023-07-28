@@ -1060,6 +1060,18 @@ def resizeFrame( frame ):
     return frame
 
 
+def messagesDisplay( frame, messages ):
+
+    textX = options['screenHeight'] - 10
+
+    for message in messages:
+        textsize = cv2.getTextSize(message, options['debugFont'], 1, 1)[0]
+        cv2.putText( frame, message, (10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+        textX -= 30
+
+    return frame
+
+
 
 targetTime = 1./options['fps']
 previousTime = currentTime = time.time()
@@ -1095,6 +1107,8 @@ additionalFrameTime = 0
 
 frameCountIn1Minute = options['fps']*60
 beatList = np.zeros(frameCountIn1Minute)
+
+messages = []
 
 # main loop
 while True:
@@ -1132,6 +1146,12 @@ while True:
 
     frame = debugDisplay(frame, onset)
 
+    if len(messages) > 0:
+        frame = messagesDisplay(frame, messages)
+
+        if frameNumber%(options['fps']/2) == 0: # TODO: this should be depending on when the message was added
+            messages.pop(0)
+
     cv2.imshow(options['windowName'], frame)
 
     usedTime = time.time() - startTime
@@ -1150,52 +1170,73 @@ while True:
     fpsMeasurement = (fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
 
     if key == 27: # escape
+        messages.append('exiting')
         break
 
     elif key == 32: # space
+        messages.append('fake beat')
         onset = True
 
     elif key&0xFF == ord('i'):
+        messages.append('change random videostream index')
         videostreams.changeVideostreamIndex()
 
     elif key&0xFF == ord('c'):
+        messages.append('change random videostream input')
         videostreams.changeVideostreamInput()
 
     elif key&0xFF == ord('0'):
+        messages.append('toggle all effects')
         effects.toggle('all')
     elif key&0xFF == ord('1'):
+        messages.append('toggle colorMap effect')
         effects.toggle('colorMap')
     elif key&0xFF == ord('2'):
+        messages.append('toggle blur effect')
         effects.toggle('blur')
     elif key&0xFF == ord('3'):
+        messages.append('toggle edgeDetection effect')
         effects.toggle('edgeDetection')
     elif key&0xFF == ord('4'):
+        messages.append('toggle flip effect')
         effects.toggle('flip')
     elif key&0xFF == ord('5'):
+        messages.append('toggle sharpening effect')
         effects.toggle('sharpening')
     elif key&0xFF == ord('6'):
+        messages.append('toggle emboss effect')
         effects.toggle('emboss')
     elif key&0xFF == ord('7'):
+        messages.append('toggle inverse effect')
         effects.toggle('inverse')
     elif key&0xFF == ord('8'):
+        messages.append('toggle multiple effect')
         effects.toggle('multiple')
 
     elif key&0xFF == ord('q'):
+        messages.append('toggle fps debug display')
         options['debugFPS'] = not options['debugFPS']
     elif key&0xFF == ord('w'):
+        messages.append('toggle timing debug display')
         options['debugTiming'] = not options['debugTiming']
     elif key&0xFF == ord('e'):
+        messages.append('toggle videostreams debug display')
         options['debugStreams'] = not options['debugStreams']
     elif key&0xFF == ord('r'):
+        messages.append('toggle effects debug display')
         options['debugEffects'] = not options['debugEffects']
     elif key&0xFF == ord('t'):
+        messages.append('toggle audio debug display')
         options['debugAudio'] = not options['debugAudio']
     elif key&0xFF == ord('z'):
+        messages.append('toggle onset debug display')
         options['debugOnset'] = not options['debugOnset']
     elif key&0xFF == ord('u'):
+        messages.append('toggle bpm debug display')
         options['debugBpm'] = not options['debugBpm']
 
     elif key&0xFF == ord('d'):
+        messages.append('toggle all debug displays')
         newBool = not options['debugFPS']
         options['debugFPS'] = newBool
         options['debugTiming'] = newBool
@@ -1210,12 +1251,14 @@ while True:
             options['sensitivity'] = 0.0
         if options['verbose']:
             print('set sensitivity to '+str(options['sensitivity']))
+        messages.append('decrease sensitivity to '+str(options['sensitivity']))
     elif key&0xFF == ord('.'):
         options['sensitivity'] += 0.05
         if options['sensitivity'] > 1:
             options['sensitivity'] = 1.0
         if options['verbose']:
             print('set sensitivity to '+str(options['sensitivity']))
+        messages.append('increase sensitivity to '+str(options['sensitivity']))
 
     if onset:
         videostreams.onset()
