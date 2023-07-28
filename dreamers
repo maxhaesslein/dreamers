@@ -696,13 +696,15 @@ class AudioProcessor:
 
         self.running = True
         self.queue = Queue()
-        self.bpm = 0
 
         self.fpsMeasurement = options['fps']
 
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
+
+        win_s = audioOptions['bufferSize']*2
+        hop_s = int(win_s // 2)
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format=audioOptions['format'],
@@ -712,9 +714,6 @@ class AudioProcessor:
                                     frames_per_buffer=audioOptions['bufferSize'],
                                     rate=audioOptions['sampleRate'])
 
-        win_s = audioOptions['bufferSize']*2
-        hop_s = int(win_s // 2)
-
         self.onsetDetection = aubio.onset(method=audioOptions['onsetMethod'], buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
         self.tempoDetection = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
 
@@ -722,11 +721,7 @@ class AudioProcessor:
             print('start aubio onset and beat detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(win_s)+' / hop_s: '+str(hop_s)+' / onsetMethod: '+str(audioOptions['onsetMethod']))
 
 
-        self.onset = False
-
-
     def start(self):
-
         t = Thread(target=self.update, args=())
         t.daemon = True
         t.start()
@@ -743,31 +738,32 @@ class AudioProcessor:
             startTime = time.time()
 
             # available frames: self.stream.get_read_available()
-
             audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
-
-            self.onset = False
             signal = np.frombuffer(audiobuffer, dtype=np.float32)
-            if self.onsetDetection(signal):
-                self.onset = True
 
-            if self.tempoDetection(signal):
-                self.onset = True
+            onset = False
+            onsetDet = self.onsetDetection(signal)
+            if onsetDet:
+                print('    onset: ',onsetDet)
+                onset = True
 
-            bpm = self.tempoDetection.get_bpm()
-            if bpm > 0:
-                self.bpm = bpm
+            tempo = self.tempoDetection(signal)
+            if tempo:
+                print('    tempo: ',tempo)
+                onset = True
 
-            peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+            if options['debugAudio']:
+                peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
-            self.peakBuffer[self.peakBufferIndex] = peak
-            self.peakBufferOnset[self.peakBufferIndex] = self.onset
+                self.peakBuffer[self.peakBufferIndex] = peak
+                self.peakBufferOnset[self.peakBufferIndex] = onset
 
-            self.peakBufferIndex += 1
-            if self.peakBufferIndex >= len(self.peakBuffer):
-                self.peakBufferIndex = 0
+                self.peakBufferIndex += 1
+                if self.peakBufferIndex >= len(self.peakBuffer):
+                    self.peakBufferIndex = 0
 
-            if self.onset:
+
+            if onset:
                 self.queue.put(True)
 
             usedTime = time.time() - startTime
@@ -783,7 +779,7 @@ class AudioProcessor:
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement, self.bpm
+        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement
 
 
     def isOnset(self):
@@ -965,7 +961,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index, audioFpsMeasurement, bpm = audio.getInfo()
+        data, onsetData, index, audioFpsMeasurement = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -1001,12 +997,6 @@ def debugDisplay( im, onset ):
         text = 'Audio FPS: '+str(int(audioFpsMeasurement))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
-
-        textX += 30
-
-        text = 'BPM: '+str(int(bpm))
-        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
 
         textX += 30
 
