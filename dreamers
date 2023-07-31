@@ -33,6 +33,7 @@ print("      5: toggle effect 'sharpening'")
 print("      6: toggle effect 'emboss'")
 print("      7: toggle effect 'inverse'")
 print("      8: toggle effect 'multiple'")
+print("      9: toggle effect 'text'")
 print("      0: toggle all effects")
 print('')
 print("      q: toggle FPS debug display")
@@ -70,12 +71,12 @@ import aubio
 options = {
 
     'debugFPS': True,
-    'debugTiming': True,
+    'debugTiming': False,
     'debugStreams': False,
     'debugEffects': False,
     'debugAudio': False,
     'debugOnset': False,
-    'debugBpm': True,
+    'debugBpm': False,
     'debugLoudness': False,
 
     'verbose': True,
@@ -126,11 +127,14 @@ options = {
         'emboss': False,
         'inverse': False,
         'multiple': True,
+        'text': True,
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 
     'fontFile': 'fonts/Averia_Serif_Libre/AveriaSerifLibre-Bold.ttf',
-    'fontSize': 10,
+    'fontSize': 4,
+
+    'texts': [ "OBEY", "CONSUME", "FOLLOW" ]
 
 }
 
@@ -138,8 +142,7 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 0, # DEBUG
-    #'changeVideoStream': 18, # if this is too low, fps goes down
+    'changeVideoStream': 3,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -150,15 +153,24 @@ probabilities = {
     'setEmboss': 125,
     'setInverse': 80,
     'unsetInverse': 12,
-    'setMultiple': 100, #330,
-    'unsetMultiple': 60
+    'setMultiple': 100,
+    'unsetMultiple': 60,
+    'setText': 80,
 }
 
+minVals = {
+    'blur': 4,
+    'edgeDetection': 2,
+    'sharpening': 2,
+    'emboss': 2,
+    'text': 6,
+}
 maxVals = {
     'blur': 30,
     'edgeDetection': 10,
     'sharpening': 20,
-    'emboss': 10
+    'emboss': 10,
+    'text': 6,
 }
 
 
@@ -468,7 +480,10 @@ class EffectProcessor():
             'emboss': 0,
             'inverse': 0,
             'multiple': 0,
+            'text': 0,
         }
+
+        self.text = False
 
         self.active = options['effectsActiveList']
 
@@ -583,6 +598,29 @@ class EffectProcessor():
         if self.active['colorMap'] and self.options['colorMap'] > 0:
             frame = cv2.applyColorMap(frame, self.colorMaps[self.options['colorMap']-1])
 
+        # text
+        if self.active['text'] and self.options['text'] > 0:
+            self.options['text'] -= 1
+            if self.options['text'] == 0:
+                self.text = False
+            else:
+                if not self.text:
+                    self.text = random.choice(options['texts'])
+                fontSize = options['fontSize']
+                fontWidth = options['fontSize']
+                color = (255,255,255)
+                if customFont:
+                    fontSize = fontSize * 40
+                    textSize = customFont.getTextSize(self.text, fontSize, fontWidth)[0]
+                    textX = int((options['screenWidth'] - textSize[0]) / 2)
+                    textY = int((options['screenHeight'] + textSize[1]/2) / 2)
+                    customFont.putText( img=frame, text=self.text, org=(textX, textY), fontHeight=fontSize, color=color, thickness=-1, line_type=cv2.LINE_AA, bottomLeftOrigin=True )
+                else:
+                    textSize = cv2.getTextSize(self.text, font, fontSize, fontWidth)[0]
+                    textX = int((options['screenWidth'] - textSize[0]) / 2)
+                    textY = int((options['screenHeight'] - textSize[1]/2) / 2)
+                    cv2.putText( img=frame, text=self.text, org=(textX, textY), fontFace=font, fontScale=fontSize, color=color, thickness=fontWidth, lineType=cv2.LINE_AA )
+
         return frame
 
 
@@ -614,12 +652,12 @@ class EffectProcessor():
 
         # set blur
         elif effect == 'blur':
-            self.options['blur'] = [random.randint(4, maxVals['blur']), random.randint(4, maxVals['blur'])]
+            self.options['blur'] = [random.randint(minVals['blur'], maxVals['blur']), random.randint(minVals['blur'], maxVals['blur'])]
             if options['verbose']: print('set blur to '+str(self.options['blur']))
 
         # set edge detection
         elif effect == 'edgeDetection':
-            self.options['edgeDetection'] = random.randint(2, maxVals['edgeDetection'])
+            self.options['edgeDetection'] = random.randint(minVals['edgeDetection'], maxVals['edgeDetection'])
             if options['verbose']: print('set edge detection to '+str(self.options['edgeDetection']))
 
         # set flip
@@ -633,13 +671,13 @@ class EffectProcessor():
 
         # set sharpening
         elif effect == 'sharpening':
-            self.options['sharpening'] = random.randint(2, maxVals['sharpening'])
+            self.options['sharpening'] = random.randint(minVals['sharpening'], maxVals['sharpening'])
             if options['verbose']: print('set sharpening to '+str(self.options['sharpening']))
 
         # set emboss
         elif effect == 'emboss':
-            self.options['emboss'] = random.randint(2, maxVals['emboss'])
-            if options['verbose']: print('set sharpening to '+str(self.options['emboss']))
+            self.options['emboss'] = random.randint(minVals['emboss'], maxVals['emboss'])
+            if options['verbose']: print('set emboss to '+str(self.options['emboss']))
 
         # set inverse
         elif effect == 'inverse':
@@ -661,6 +699,11 @@ class EffectProcessor():
         elif effect == 'unMultiple':
             self.options['multiple'] = 0
             if options['verbose']: print('reset multiple')
+
+        # set text
+        elif effect == 'text':
+            self.options['text'] = random.randint(minVals['text'], maxVals['text'])
+            if options['verbose']: print('set text to '+str(self.options['text']))
 
 
     def toggle(self, effect, setToBool = 'none' ):
@@ -729,6 +772,9 @@ class EffectProcessor():
         elif probabilityCheck('setMultiple'):
             self.activate('multiple')
 
+        # set text
+        if probabilityCheck('setText'):
+            self.activate('text')
 
 
     def getInfo(self):
@@ -924,6 +970,9 @@ def debugDisplay( im, onset ):
             elif key == 'emboss':
                 maxVal = maxVals['emboss']
                 text = 'emb'
+            elif key == 'text':
+                maxVal = maxVals['text']
+                text = 'txt'
             elif key == 'inverse':
                 text = 'inv'
             elif key == 'multiple':
@@ -1298,6 +1347,9 @@ while True:
     elif key&0xFF == ord('8'):
         messages.append('toggle multiple effect')
         effects.toggle('multiple')
+    elif key&0xFF == ord('9'):
+        messages.append('toggle text effect')
+        effects.toggle('text')
 
     elif key&0xFF == ord('q'):
         messages.append('toggle fps debug display')
