@@ -573,10 +573,9 @@ class EffectProcessor():
                 frame = np.concatenate((frame, frame), axis=1) # stack horizontally
 
             elif self.options['multiple'] == 3:
-                frame = cv2.resize(frame, (0,0), fx=0.334, fy=0.334)
+                frame = cv2.resize(frame, (0,0), fx=0.335, fy=0.335)
                 frame = np.concatenate((frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame), axis=1)
-                frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
             elif self.options['multiple'] == 4:
                 frame = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
@@ -589,10 +588,11 @@ class EffectProcessor():
                 frame = np.concatenate((frame, frame, frame, frame, frame), axis=1)
 
             elif self.options['multiple'] == 6:
-                frame = cv2.resize(frame, (0,0), fx=0.167, fy=0.167)
+                frame = cv2.resize(frame, (0,0), fx=0.168, fy=0.168)
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=0)
                 frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
-                frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
+
+            frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         # tint image
         if self.active['colorMap'] and self.options['colorMap'] > 0:
