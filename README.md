@@ -38,3 +38,5 @@ pcm.mic {
 ```
 
 You also need to check all the options at the beginning of the `dreamers` file and change them accordingly.
+
+You can also add custom font files (.ttf) into the `fonts/` subfolder and then set it in the `options` variable.

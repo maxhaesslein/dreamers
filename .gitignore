@@ -1,2 +1,4 @@
 footage*
 !footage/.gitkeep
+fonts*
+!fonts/.gitkeep

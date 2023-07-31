@@ -69,14 +69,14 @@ import aubio
 
 options = {
 
-    'debugFPS': False,
-    'debugTiming': False,
+    'debugFPS': True,
+    'debugTiming': True,
     'debugStreams': False,
     'debugEffects': False,
     'debugAudio': False,
     'debugOnset': False,
     'debugBpm': True,
-    'debugLoudness': True,
+    'debugLoudness': False,
 
     'verbose': True,
 
@@ -84,13 +84,13 @@ options = {
     'fps': 25,
     'fpsSmoothing':  0.6, # this smoothes only the fps _debug display_, NOT the real fps
 
-    'screenWidth': 1280,
-    'screenHeight': 720,
+    'screenWidth': 1024,
+    'screenHeight': 768,
 
 
     'effectsActive': True,
-    'frameResize': False,
-    'resizeFrameOnLoad': False,
+    'frameResize': True,
+    'resizeFrameOnLoad': True,
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
@@ -129,6 +129,9 @@ options = {
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 
+    'fontFile': 'fonts/Averia_Serif_Libre/AveriaSerifLibre-Bold.ttf',
+    'fontSize': 10,
+
 }
 
 
@@ -165,23 +168,48 @@ cv2.resizeWindow( options['windowName'], options['screenWidth'], options['screen
 cv2.setWindowProperty( options['windowName'], cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN )
 
 
+# setup custom font
+customFont = False
+if options['fontFile']:
+    customFont = cv2.freetype.createFreeType2()
+    customFont.loadFontData( fontFileName=options['fontFile'], id=0 )
+
+
 # display startup image
 startupImage = np.zeros((options['screenHeight'], options['screenWidth'], 3), np.uint8)
-font = cv2.FONT_HERSHEY_TRIPLEX # TODO: use custom font
+font = cv2.FONT_HERSHEY_TRIPLEX
 text = "The Dreamers"
-fontsize = 2
-fontwidth = 3
-textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
-textX = int((options['screenWidth'] - textsize[0]) / 2)
-textY = int((options['screenHeight'] - textsize[1]) / 2)
-cv2.putText(startupImage, text, (textX, textY), font, fontsize, (185,107,250), fontwidth)
+fontSize = 2
+fontWidth = 3
+color = (185,107,250)
+if customFont:
+    fontSize = fontSize * 40
+    textSize = customFont.getTextSize(text, fontSize, fontWidth)[0]
+    textX = int((options['screenWidth'] - textSize[0]) / 2)
+    textY = int((options['screenHeight'] - textSize[1]) / 2)
+    customFont.putText( img=startupImage, text=text, org=(textX, textY), fontHeight=fontSize, color=color, thickness=-1, line_type=cv2.LINE_AA, bottomLeftOrigin=True )
+else:
+    textSize = cv2.getTextSize(text, font, fontSize, fontWidth)[0]
+    textX = int((options['screenWidth'] - textSize[0]) / 2)
+    textY = int((options['screenHeight'] - textSize[1]) / 2)
+    cv2.putText( img=startupImage, text=text, org=(textX, textY), fontFace=font, fontScale=fontSize, color=color, thickness=fontWidth, lineType=cv2.LINE_AA )
+
 text = "loading ..."
-fontsize = 1
-fontwidth = 1
-textsize = cv2.getTextSize(text, font, fontsize, fontwidth)[0]
-textX = int((options['screenWidth'] - textsize[0]) / 2)
-textY = int((options['screenHeight'] - textsize[1]))
-cv2.putText(startupImage, text, (textX, textY), font, fontsize, (255,255,255), fontwidth)
+fontSize = 1
+fontWidth = 1
+color = (255,255,255)
+if customFont:
+    fontSize = fontSize * 40
+    textSize = customFont.getTextSize(text, fontSize, fontWidth)[0]
+    textX = int((options['screenWidth'] - textSize[0]) / 2)
+    textY = int((options['screenHeight'] - textSize[1]*2))
+    customFont.putText( img=startupImage, text=text, org=(textX, textY), fontHeight=fontSize, color=color, thickness=-1, line_type=cv2.LINE_AA, bottomLeftOrigin=True )
+else:
+    textSize = cv2.getTextSize(text, font, fontSize, fontWidth)[0]
+    textX = int((options['screenWidth'] - textSize[0]) / 2)
+    textY = int((options['screenHeight'] - textSize[1]*2))
+    cv2.putText( img=startupImage, text=text, org=(textX, textY), fontFace=font, fontScale=fontSize, color=color, thickness=fontWidth, lineType=cv2.LINE_AA )
+
 cv2.imshow(options['windowName'], startupImage)
 cv2.waitKey(60)
 
