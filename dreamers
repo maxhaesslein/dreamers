@@ -51,8 +51,7 @@ print("      s: toggle onset detection")
 print('')
 print("      ,: decrease sensitivity")
 print("      .: increase sensitivity")
-#print("    s: sharpening overlay")
-#print("    p: pause rendering")
+print("      p: pause rendering")
 #print("    v: verbose level")
 print("")
 print("###############################")
@@ -901,8 +900,6 @@ class AudioProcessor:
 
     def isOnset(self):
 
-        # TODO: if last onset is way too long ago, force onset
-
         if self.queue.qsize() > 0:
             return self.queue.get()
 
@@ -1267,6 +1264,8 @@ loudness = 0
 averageLoudness = 0
 loudnessList = np.zeros(frameCountIn10Seconds)
 
+paused = False
+
 messages = []
 
 # main loop
@@ -1274,43 +1273,67 @@ while True:
 
     startTime = time.time()
 
-    frame = videostreams.getNextFrame()
-    if type(frame) == type(None): # no frame retreived, use last frame
-        frame = lastFrame
+    if paused:
 
-    lastFrame = frame
+        void = audio.isOnset()
 
-    if not options['resizeFrameOnLoad'] and options['resizeFrameBeforeEffect']:
-        frame = resizeFrame(frame)
+        frame = lastFrame.copy()
 
-    if options['effectsActive']:
-        if options['effectsMultithreaded']:
-            nextFrame = frame
-            frame = effects.get()
-            effects.put(nextFrame)
+        font = cv2.FONT_HERSHEY_TRIPLEX
+        text = "paused"
+        fontSize = 2
+        fontWidth = 3
+        color = (185,107,250)
+        if customFont:
+            fontSize = fontSize * 40
+            textSize = customFont.getTextSize(text, fontSize, fontWidth)[0]
+            textX = int((options['screenWidth'] - textSize[0]) / 2)
+            textY = int((options['screenHeight'] - textSize[1]) / 2)
+            customFont.putText( img=frame, text=text, org=(textX, textY), fontHeight=fontSize, color=color, thickness=-1, line_type=cv2.LINE_AA, bottomLeftOrigin=True )
         else:
-            frame = effects.apply(frame)
+            textSize = cv2.getTextSize(text, font, fontSize, fontWidth)[0]
+            textX = int((options['screenWidth'] - textSize[0]) / 2)
+            textY = int((options['screenHeight'] - textSize[1]) / 2)
+            cv2.putText( img=frame, text=text, org=(textX, textY), fontFace=font, fontScale=fontSize, color=color, thickness=fontWidth, lineType=cv2.LINE_AA )
 
-    if not options['resizeFrameOnLoad'] and not options['resizeFrameBeforeEffect']:
-        frame = resizeFrame(frame)
-
-    onset = audio.isOnset()
-    loudness = audio.getLoudness()
-
-    listIndex30 = frameNumber%frameCountIn30Seconds
-    if onset:
-        beatList[listIndex30] = 1
     else:
-        beatList[listIndex30] = 0
+        frame = videostreams.getNextFrame()
+        if type(frame) == type(None): # no frame retreived, use last frame
+            frame = lastFrame
 
-    bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
+        lastFrame = frame.copy()
 
-    listIndex10 = frameNumber%frameCountIn10Seconds
-    bpmList[listIndex10] = bpm
-    loudnessList[listIndex10] = loudness
+        if not options['resizeFrameOnLoad'] and options['resizeFrameBeforeEffect']:
+            frame = resizeFrame(frame)
 
-    averageLoudness = np.mean(loudnessList)
-    averageBpm = np.mean(bpmList)
+        if options['effectsActive']:
+            if options['effectsMultithreaded']:
+                nextFrame = frame
+                frame = effects.get()
+                effects.put(nextFrame)
+            else:
+                frame = effects.apply(frame)
+
+        if not options['resizeFrameOnLoad'] and not options['resizeFrameBeforeEffect']:
+            frame = resizeFrame(frame)
+
+        onset = audio.isOnset()
+        loudness = audio.getLoudness()
+
+        listIndex30 = frameNumber%frameCountIn30Seconds
+        if onset:
+            beatList[listIndex30] = 1
+        else:
+            beatList[listIndex30] = 0
+
+        bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
+
+        listIndex10 = frameNumber%frameCountIn10Seconds
+        bpmList[listIndex10] = bpm
+        loudnessList[listIndex10] = loudness
+
+        averageLoudness = np.mean(loudnessList)
+        averageBpm = np.mean(bpmList)
 
 
     frame = debugDisplay(frame, onset)
@@ -1406,6 +1429,13 @@ while True:
     elif key&0xFF == ord('i'):
         newMessage('toggle loudness debug display')
         options['debugLoudness'] = not options['debugLoudness']
+
+    elif key&0xFF == ord('p'):
+        paused = not paused
+        if paused:
+            newMessage('pause rendering')
+        else:
+            newMessage('un-pause rendering')
 
     elif key&0xFF == ord('d'):
         newMessage('toggle all debug displays')
