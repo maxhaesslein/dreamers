@@ -75,9 +75,9 @@ options = {
     'debugStreams': True,
     'debugEffects': True,
     'debugAudio': True,
-    'debugOnset': True,
+    'debugOnset': False,
     'debugBpm': True,
-    'debugLoudness': True,
+    'debugLoudness': False,
 
     'verbose': True,
 
@@ -122,7 +122,7 @@ options = {
         'colorMap': False,
         'blur': False,
         'edgeDetection': False,
-        'flip': False,
+        'flip': True,
         'sharpening': False,
         'emboss': False,
         'inverse': False,
@@ -302,6 +302,8 @@ class VideostreamProcessor():
         self.streams = []
         self.index = 0
 
+        self.videos = []
+
         for i in range(options['videostreamCount']):
             self.streams.append( self.loadVideo() )
 
@@ -315,7 +317,14 @@ class VideostreamProcessor():
 
     def loadVideo(self):
 
-        videoFile = random.choice(videoFiles)
+        if len(self.videos) <= 0:
+            if options['verbose']:
+                print('resetting videolist')
+            self.videos = videoFiles
+            random.shuffle(self.videos)
+
+        videoFile = self.videos.pop(1)
+
         videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
 
         # we currently start always at the beginning of the video; seeking may add framedrops
@@ -323,6 +332,10 @@ class VideostreamProcessor():
         #if maxFrameCount > 100:
         #    startFrame = random.randint(0, maxFrameCount-100)
         #    videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
+
+        if options['verbose']:
+            print('loading new video', videoFile)
+            print('videos left in list:', len(self.videos))
 
         stream = {
             'queue': Queue(maxsize=options['videostreamMaxQueueSize']),
@@ -374,6 +387,9 @@ class VideostreamProcessor():
         if stream['queue'].full():
             return
 
+        if stream['videoIn'] == False:
+            return
+
         ret, frame = stream['videoIn'].read()
 
         if ret == False:
@@ -400,6 +416,8 @@ class VideostreamProcessor():
                 randomIndex = 0
             if randomIndex == self.index:
                 continue
+            if self.streams[randomIndex]['videoIn'] == False:
+                continue
             if self.streams[randomIndex]['queue'].qsize() >= 5:
                 # find a stream that has at least 5 frames in its queue, then break
                 break
@@ -418,8 +436,10 @@ class VideostreamProcessor():
             return
 
         # close old stream
+        if options['verbose']:
+            print('change video on stream', streamIndex)
         self.streams[streamIndex]['videoIn'].release()
-
+        self.streams[streamIndex]['videoIn'] = False
         self.streams[streamIndex] = self.loadVideo()
 
 
