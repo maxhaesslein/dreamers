@@ -74,12 +74,12 @@ import aubio
 options = {
 
     'debugFPS': True,
-    'debugTiming': True,
-    'debugStreams': True,
-    'debugEffects': True,
-    'debugAudio': True,
+    'debugTiming': False,
+    'debugStreams': False,
+    'debugEffects': False,
+    'debugAudio': False,
     'debugOnset': False,
-    'debugBpm': True,
+    'debugBpm': False,
     'debugLoudness': False,
 
     'verbose': True,
@@ -339,8 +339,7 @@ class VideostreamProcessor():
         #    videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
 
         if options['verbose']:
-            print('loading new video', videoFile)
-            print('videos left in list:', len(self.videos))
+            print('loading new video "'+str(videoFile)+'" ('+str(len(self.videos))+' videos left in list)')
 
         stream = {
             'queue': Queue(maxsize=options['videostreamMaxQueueSize']),
@@ -392,9 +391,6 @@ class VideostreamProcessor():
         if stream['queue'].full():
             return
 
-        #if stream['videoIn'] == False:
-        #    return
-
         ret, frame = stream['videoIn'].read()
 
         if ret == False:
@@ -421,8 +417,6 @@ class VideostreamProcessor():
                 randomIndex = 0
             if randomIndex == self.index:
                 continue
-            #if self.streams[randomIndex]['videoIn'] == False:
-            #    continue
             if self.streams[randomIndex]['queue'].qsize() >= 5:
                 # find a stream that has at least 5 frames in its queue, then break
                 break
@@ -443,8 +437,6 @@ class VideostreamProcessor():
         # close old stream
         if options['verbose']:
             print('change video on stream', streamIndex)
-        #self.streams[streamIndex]['videoIn'].release()
-        #self.streams[streamIndex]['videoIn'] = False
         self.streams[streamIndex] = self.loadVideo()
 
 
@@ -1210,12 +1202,25 @@ def messagesDisplay( frame, messages ):
     textX = options['screenHeight'] - 10
 
     for message in messages:
-        textsize = cv2.getTextSize(message, options['debugFont'], 1, 1)[0]
-        cv2.putText( frame, message, (10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
+        text = message['text']
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( frame, text, (10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
         textX -= 30
+
+        if frameNumber > message['lifeTime']:
+            messages.remove(message)
 
     return frame
 
+
+def newMessage( text ):
+
+    message = {
+        'text': text,
+        'lifeTime': frameNumber + options['fps']
+    }
+
+    messages.append(message)
 
 
 targetTime = 1./options['fps']
@@ -1313,9 +1318,6 @@ while True:
     if len(messages) > 0:
         frame = messagesDisplay(frame, messages)
 
-        if frameNumber%(options['fps']/2) == 0: # TODO: this should be depending on when the message was added
-            messages.pop(0)
-
     cv2.imshow(options['windowName'], frame)
 
     usedTime = time.time() - startTime
@@ -1334,79 +1336,79 @@ while True:
     fpsMeasurement = (fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
 
     if key == 27: # escape
-        messages.append('exiting')
+        newMessage('exiting')
         break
 
     elif key == 32: # space
-        messages.append('fake beat')
+        newMessage('fake beat')
         onset = True
 
     elif key&0xFF == ord('i'):
-        messages.append('change random videostream index')
+        newMessage('change random videostream index')
         videostreams.changeVideostreamIndex()
 
     elif key&0xFF == ord('c'):
-        messages.append('change random videostream input')
+        newMessage('change random videostream input')
         videostreams.changeVideostreamInput()
 
     elif key&0xFF == ord('0'):
-        messages.append('toggle all effects')
+        newMessage('toggle all effects')
         effects.toggle('all')
     elif key&0xFF == ord('1'):
-        messages.append('toggle colorMap effect')
+        newMessage('toggle colorMap effect')
         effects.toggle('colorMap')
     elif key&0xFF == ord('2'):
-        messages.append('toggle blur effect')
+        newMessage('toggle blur effect')
         effects.toggle('blur')
     elif key&0xFF == ord('3'):
-        messages.append('toggle edgeDetection effect')
+        newMessage('toggle edgeDetection effect')
         effects.toggle('edgeDetection')
     elif key&0xFF == ord('4'):
-        messages.append('toggle flip effect')
+        newMessage('toggle flip effect')
         effects.toggle('flip')
     elif key&0xFF == ord('5'):
-        messages.append('toggle sharpening effect')
+        newMessage('toggle sharpening effect')
         effects.toggle('sharpening')
     elif key&0xFF == ord('6'):
-        messages.append('toggle emboss effect')
+        newMessage('toggle emboss effect')
         effects.toggle('emboss')
     elif key&0xFF == ord('7'):
-        messages.append('toggle inverse effect')
+        newMessage('toggle inverse effect')
         effects.toggle('inverse')
     elif key&0xFF == ord('8'):
-        messages.append('toggle multiple effect')
+        newMessage('toggle multiple effect')
         effects.toggle('multiple')
     elif key&0xFF == ord('9'):
-        messages.append('toggle text effect')
+        newMessage('toggle text effect')
         effects.toggle('text')
 
     elif key&0xFF == ord('q'):
-        messages.append('toggle fps debug display')
+        newMessage('toggle fps debug display')
         options['debugFPS'] = not options['debugFPS']
     elif key&0xFF == ord('w'):
-        messages.append('toggle timing debug display')
+        newMessage('toggle timing debug display')
         options['debugTiming'] = not options['debugTiming']
     elif key&0xFF == ord('e'):
-        messages.append('toggle videostreams debug display')
+        newMessage('toggle videostreams debug display')
         options['debugStreams'] = not options['debugStreams']
     elif key&0xFF == ord('r'):
-        messages.append('toggle effects debug display')
+        newMessage('toggle effects debug display')
         options['debugEffects'] = not options['debugEffects']
     elif key&0xFF == ord('t'):
-        messages.append('toggle audio debug display')
+        newMessage('toggle audio debug display')
         options['debugAudio'] = not options['debugAudio']
     elif key&0xFF == ord('z'):
-        messages.append('toggle onset debug display')
+        newMessage('toggle onset debug display')
         options['debugOnset'] = not options['debugOnset']
     elif key&0xFF == ord('u'):
-        messages.append('toggle bpm debug display')
+        newMessage('toggle bpm debug display')
         options['debugBpm'] = not options['debugBpm']
     elif key&0xFF == ord('i'):
-        messages.append('toggle loudness debug display')
+        newMessage('toggle loudness debug display')
         options['debugLoudness'] = not options['debugLoudness']
 
     elif key&0xFF == ord('d'):
-        messages.append('toggle all debug displays')
+        newMessage('toggle all debug displays')
         newBool = not options['debugFPS']
         options['debugFPS'] = newBool
         options['debugTiming'] = newBool
@@ -1418,11 +1420,11 @@ while True:
         options['debugLoudness'] = newBool
 
     elif key&0xFF == ord('a'):
-        messages.append('toggle beat detection')
         options['detectBeat'] = not options['detectBeat']
+        newMessage('set beat detection to '+str(options['detectBeat']))
     elif key&0xFF == ord('s'):
-        messages.append('toggle onset detection')
         options['detectOnset'] = not options['detectOnset']
+        newMessage('set onset detection to '+str(options['detectOnset']))
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
@@ -1430,14 +1432,14 @@ while True:
             options['sensitivity'] = 0.0
         if options['verbose']:
             print('set sensitivity to '+str(options['sensitivity']))
-        messages.append('decrease sensitivity to '+str(options['sensitivity']))
+        newMessage('decrease sensitivity to '+str(options['sensitivity']))
     elif key&0xFF == ord('.'):
         options['sensitivity'] += 0.05
         if options['sensitivity'] > 1:
             options['sensitivity'] = 1.0
         if options['verbose']:
             print('set sensitivity to '+str(options['sensitivity']))
-        messages.append('increase sensitivity to '+str(options['sensitivity']))
+        newMessage('increase sensitivity to '+str(options['sensitivity']))
 
     if onset:
         videostreams.onset()
