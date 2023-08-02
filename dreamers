@@ -46,6 +46,9 @@ print("      u: toggle bpm debug display")
 print("      i: toggle loudness debug display")
 print("      d: toggle all debug displays")
 print('')
+print("      a: toggle beat detection")
+print("      s: toggle onset detection")
+print('')
 print("      ,: decrease sensitivity")
 print("      .: increase sensitivity")
 #print("    s: sharpening overlay")
@@ -85,18 +88,20 @@ options = {
     'fps': 25,
     'fpsSmoothing':  0.6, # this smoothes only the fps _debug display_, NOT the real fps
 
-    'screenWidth': 1024,
-    'screenHeight': 768,
+    'screenWidth': 720, #1024,
+    'screenHeight': 720, #768,
 
 
     'effectsActive': True,
-    'frameResize': False,
-    'resizeFrameOnLoad': False,
+    'frameResize': True,
+    'resizeFrameOnLoad': True,
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
     'grayscale': False,
 
+    'detectOnset': False,
+    'detectBeat': True,
 
     'videostreamCount': 20,
     'videostreamMaxQueueSize': 20,
@@ -317,10 +322,10 @@ class VideostreamProcessor():
 
     def loadVideo(self):
 
-        if len(self.videos) <= 0:
+        if len(self.videos) <= 1:
             if options['verbose']:
                 print('resetting videolist')
-            self.videos = videoFiles
+            self.videos = videoFiles.copy()
             random.shuffle(self.videos)
 
         videoFile = self.videos.pop(1)
@@ -387,8 +392,8 @@ class VideostreamProcessor():
         if stream['queue'].full():
             return
 
-        if stream['videoIn'] == False:
-            return
+        #if stream['videoIn'] == False:
+        #    return
 
         ret, frame = stream['videoIn'].read()
 
@@ -416,8 +421,8 @@ class VideostreamProcessor():
                 randomIndex = 0
             if randomIndex == self.index:
                 continue
-            if self.streams[randomIndex]['videoIn'] == False:
-                continue
+            #if self.streams[randomIndex]['videoIn'] == False:
+            #    continue
             if self.streams[randomIndex]['queue'].qsize() >= 5:
                 # find a stream that has at least 5 frames in its queue, then break
                 break
@@ -438,8 +443,8 @@ class VideostreamProcessor():
         # close old stream
         if options['verbose']:
             print('change video on stream', streamIndex)
-        self.streams[streamIndex]['videoIn'].release()
-        self.streams[streamIndex]['videoIn'] = False
+        #self.streams[streamIndex]['videoIn'].release()
+        #self.streams[streamIndex]['videoIn'] = False
         self.streams[streamIndex] = self.loadVideo()
 
 
@@ -859,13 +864,15 @@ class AudioProcessor:
             signal = np.frombuffer(audiobuffer, dtype=np.float32)
 
             onset = False
-            onsetDet = self.onsetDetection(signal)
-            if onsetDet:
-                onset = True
+            if options['detectOnset']:
+                onsetDet = self.onsetDetection(signal)
+                if onsetDet:
+                    onset = True
 
-            tempo = self.tempoDetection(signal)
-            if tempo:
-                onset = True
+            if options['detectBeat']:
+                tempo = self.tempoDetection(signal)
+                if tempo:
+                    onset = True
 
             peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
@@ -1409,6 +1416,13 @@ while True:
         options['debugOnset'] = newBool
         options['debugBpm'] = newBool
         options['debugLoudness'] = newBool
+
+    elif key&0xFF == ord('a'):
+        messages.append('toggle beat detection')
+        options['detectBeat'] = not options['detectBeat']
+    elif key&0xFF == ord('s'):
+        messages.append('toggle onset detection')
+        options['detectOnset'] = not options['detectOnset']
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
