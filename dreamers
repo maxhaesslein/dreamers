@@ -71,13 +71,13 @@ import aubio
 options = {
 
     'debugFPS': True,
-    'debugTiming': False,
-    'debugStreams': False,
-    'debugEffects': False,
-    'debugAudio': False,
-    'debugOnset': False,
-    'debugBpm': False,
-    'debugLoudness': False,
+    'debugTiming': True,
+    'debugStreams': True,
+    'debugEffects': True,
+    'debugAudio': True,
+    'debugOnset': True,
+    'debugBpm': True,
+    'debugLoudness': True,
 
     'verbose': True,
 
@@ -90,8 +90,8 @@ options = {
 
 
     'effectsActive': True,
-    'frameResize': True,
-    'resizeFrameOnLoad': True,
+    'frameResize': False,
+    'resizeFrameOnLoad': False,
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
@@ -107,7 +107,7 @@ options = {
     'windowName': 'The Dreamers',
 
     'videoExtension': 'mp4',
-    'videoPath': 'footage/',
+    'videoPath': 'footage-1024x768/',
 
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
@@ -408,7 +408,6 @@ class VideostreamProcessor():
         if options['verbose']: print('change videostream to #'+str(self.index)+' ('+str(self.streams[self.index]['videofile'])+')')
 
 
-
     def changeVideostreamInput(self, streamIndex = False):
 
         if streamIndex == False:
@@ -417,6 +416,9 @@ class VideostreamProcessor():
         if streamIndex == self.index:
             # don't change current stream, just abort here
             return
+
+        # close old stream
+        self.streams[streamIndex]['videoIn'].release()
 
         self.streams[streamIndex] = self.loadVideo()
 
