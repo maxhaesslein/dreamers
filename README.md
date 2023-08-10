@@ -37,7 +37,7 @@ pcm.mic {
 
 ## Config options
 
-You can add a config file called *dreamers.txt* next to  the *dreamers* file. There you can overwrite the config options:
+You can add a config file called *dreamers.ini* next to  the *dreamers* file. There you can overwrite the config options:
 
 ```ini
 [Dreamers]
