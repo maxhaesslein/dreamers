@@ -62,7 +62,7 @@ import aubio
 
 options = {
 
-    'debugFPS': True,
+    'debugFPS': False,
     'debugTiming': False,
     'debugStreams': False,
     'debugEffects': False,
@@ -74,22 +74,22 @@ options = {
     'verbose': True,
 
 
-    'fps': 25,
+    'fps': 24,
     'fpsSmoothing':  0.6, # this smoothes only the fps _debug display_, NOT the real fps
 
-    'screenWidth': 720, #1024,
-    'screenHeight': 720, #768,
+    'screenWidth': 1280,
+    'screenHeight': 720,
 
 
     'effectsActive': True,
-    'frameResize': True,
-    'resizeFrameOnLoad': True,
+    'frameResize': False,
+    'resizeFrameOnLoad': False,
     'resizeFrameBeforeEffect': True,
     'effectsMultithreaded': True,
 
     'grayscale': False,
 
-    'detectOnset': False,
+    'detectOnset': True,
     'detectBeat': True,
 
     'videostreamCount': 20,
@@ -125,7 +125,7 @@ options = {
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 
-    'fontFile': 'fonts/Averia_Serif_Libre/AveriaSerifLibre-Bold.ttf',
+    'fontFile': False,
     'fontSize': 4,
 
     'texts': [ "OBEY", "CONSUME", "FOLLOW" ]
