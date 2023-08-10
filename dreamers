@@ -6,16 +6,6 @@
 # www.maxhaesslein.de
 
 
-# dependencies: opencv
-# sudo apt install python3-opencv
-# sudo apt install xserver-xorg xinit
-#
-# start with:
-# startx $HOME/dreamers/dreamers
-
-# autostart happens in ~/.config/systemd/user/dreamers.service
-
-
 print("")
 print("###############################")
 print("")

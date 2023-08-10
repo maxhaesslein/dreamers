@@ -8,11 +8,13 @@ This is a personal project and may be a bit finicky to set up. Your best bet is 
 
 ## Installation
 
-```
-sudo apt install python3-opencv xserver-xorg xinit
+Install required dependencies with:
+
+```bash
+sudo apt install python3-opencv python3-pyaudio python3-aubio xserver-xorg xinit
 ```
 
-you can then download or clone this repo, extract it into `~/dreamers` and add videofiles in the `footage/` subfolder. Then start everything by calling the `start` file.
+Then download or clone this repo, extract it into `~/dreamers` and add videofiles in a `footage/` subfolder. Then start everything by calling the `start` file.
 
 The videofiles should be h.264 encoded. The sweetspot is 1280x720px at 24/25/30 fps on a Raspberry Pi 4, without heavy effects. Don't mix resolutions or framerates.
 
@@ -44,7 +46,7 @@ You can also add custom font files (.ttf) into the `fonts/` subfolder and then s
 To allow starting over SSH, you may want to add this to your */etc/X11/Xwrapper.config*:
 
 ```
-allowed_users=anybody
+allowed_users=anybody # was: console
 ```
 
 then you can call the *start* file over SSH
