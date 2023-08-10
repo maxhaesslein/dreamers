@@ -63,5 +63,6 @@ To autostart, copy the `dreamers.service` file into `~/.config/systemd/user/drea
 ```
 sudo systemctl daemon-reload
 systemctl --user enable dreamers.service
+systemctl --user start dreamers.service
 journalctl --user -u dreamers.service
 ```
