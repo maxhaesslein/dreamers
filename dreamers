@@ -49,6 +49,7 @@ print("###############################")
 
 from queue import Queue
 from threading import Thread
+from configparser import ConfigParser
 import numpy as np
 import cv2
 import time
@@ -101,7 +102,7 @@ options = {
     'windowName': 'The Dreamers',
 
     'videoExtension': 'mp4',
-    'videoPath': 'footage-1024x768/',
+    'videoPath': 'footage/',
 
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
@@ -121,7 +122,7 @@ options = {
         'emboss': False,
         'inverse': False,
         'multiple': True,
-        'text': True,
+        'text': False,
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
 
@@ -166,6 +167,33 @@ maxVals = {
     'emboss': 10,
     'text': 6,
 }
+
+
+# check for config file and read options
+if os.path.isfile('dreamers.txt'):
+    configParser = ConfigParser()
+    configParser.read('dreamers.txt')
+
+    intOptions = [ 'fps', 'screenWidth', 'screenHeight', 'videostreamCount', 'videostreamMaxQueueSize', 'audioDisplayScaling', 'initSleepTime', 'fontSize' ]
+    floatOptions = [ 'fpsSmoothing', 'sensitivity' ]
+
+    for option in options:
+
+        if configParser.has_option('Dreamers', option):
+
+            if option in intOptions:
+                options[option] = configParser.getint('Dreamers', option)
+            elif option in floatOptions:
+                options[option] = configParser.getfloat('Dreamers', option)
+            else:
+                options[option] = configParser.get('Dreamers', option)
+
+            if options[option] == "False":
+                options[option] = False
+            elif options[option] == "True":
+                options[option] = True
+
+
 
 
 # setup window
