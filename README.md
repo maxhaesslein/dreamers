@@ -37,9 +37,14 @@ pcm.mic {
 
 ## Config options
 
-You also need to check all the options at the beginning of the `dreamers` file and change them accordingly.
+You can add a config file called *dreamers.txt* next to  the *dreamers* file. There you can overwrite the config options:
 
-You can also add custom font files (.ttf) into the `fonts/` subfolder and then set it in the `options` variable.
+```ini
+[Dreamers]
+screenWidth = 1024
+screenHeight = 768
+fps = 30
+```
 
 ## starting over SSH
 
