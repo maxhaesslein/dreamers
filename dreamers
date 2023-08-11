@@ -625,7 +625,7 @@ class EffectProcessor():
                 # if we have enough frames, show grid:
                 reverseStaggeredFrames = self.staggeredFrames[::-1]
                 frameLines = np.array_split(reverseStaggeredFrames, self.options['staggered'])
-                frameLines = np.concatenate(frameLines, axis=1) # TODO: sometimes we have a 'numpy.AxisError: axis 1 is out of bounds for array of dimension 1' error here, I'm not sure why this happens (array is only one-dimensional in some cases?)
+                frameLines = np.concatenate(frameLines, axis=1)
                 frame = np.concatenate(frameLines, axis=1)
                 frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
@@ -746,11 +746,14 @@ class EffectProcessor():
 
         # set staggered
         elif effect == 'staggered':
+            if self.options['staggered'] != 0:
+                self.staggeredFrames = [] # make sure to reset the frames list
             self.options['staggered'] = random.randint(minVals['staggered'], maxVals['staggered'])
             if options['verbose']: print('set staggered to '+str(self.options['staggered']))
         # unset staggered
         elif effect == 'unStaggered':
             self.options['staggered'] = 0
+            self.staggeredFrames = []
             if options['verbose']: print('reset staggered')
 
         # set text
