@@ -1285,7 +1285,7 @@ paused = False
 messages = []
 
 staggeredFrames = []
-staggeredFramesCount = 4
+staggeredFramesCount = 5
 
 # main loop
 while True:
@@ -1342,10 +1342,9 @@ while True:
             del staggeredFrames[:n]
         staggeredFrames.append(smallFrame)
         if len(staggeredFrames) >= staggeredFramesCount*staggeredFramesCount:
-            frameLines = []
-            for frameLine in np.array_split(staggeredFrames, staggeredFramesCount):
-                frameLines.append(np.concatenate(frameLine, axis=1))
-            frame = np.concatenate(frameLines, axis=0)
+            frameLines = np.array_split(staggeredFrames[::-1], staggeredFramesCount)
+            frameLines = np.concatenate(frameLines, axis=1)
+            frame = np.concatenate(frameLines, axis=1)
             frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         if options['frameResize'] == 'post':
