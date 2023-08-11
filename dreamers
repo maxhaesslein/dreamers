@@ -83,17 +83,15 @@ options = {
 
 
     'effectsActive': True,
-    'frameResize': False,
-    'resizeFrameOnLoad': False,
-    'resizeFrameBeforeEffect': True,
-    'effectsMultithreaded': True,
+    'frameResize': False, # can be False (no resize, default), 'load' (resize on load), 'pre' (resize before effect) or 'post' (resize after effect)
+    'effectsMultithreaded': True, # runs faster, but has 1 frame delay
 
     'grayscale': False,
 
     'detectOnset': True,
     'detectBeat': True,
 
-    'videostreamCount': 20,
+    'videostreamCount': 20, # use ~10 for 2 GB RAM, ~20 for 4 GB RAM
     'videostreamMaxQueueSize': 20,
 
 
@@ -419,7 +417,7 @@ class VideostreamProcessor():
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
 
-        if options['resizeFrameOnLoad']:
+        if options['frameResize'] == 'load':
             frame = resizeFrame(frame)
 
         stream['queue'].put(frame)
@@ -1262,7 +1260,7 @@ audio = AudioProcessor().start()
 time.sleep(0.5)
 
 if options['effectsActive'] and options['effectsMultithreaded']:
-    if not options['resizeFrameBeforeEffect']:
+    if options['frameResize'] == 'post':
         effects.put(videostreams.getNextFrame(True))
     else:
         effects.put(startupImage)
@@ -1321,7 +1319,7 @@ while True:
 
         lastFrame = frame.copy()
 
-        if not options['resizeFrameOnLoad'] and options['resizeFrameBeforeEffect']:
+        if options['frameResize'] == 'pre':
             frame = resizeFrame(frame)
 
         if options['effectsActive']:
@@ -1332,7 +1330,7 @@ while True:
             else:
                 frame = effects.apply(frame)
 
-        if not options['resizeFrameOnLoad'] and not options['resizeFrameBeforeEffect']:
+        if options['frameResize'] == 'post':
             frame = resizeFrame(frame)
 
         onset = audio.isOnset()
