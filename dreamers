@@ -119,7 +119,7 @@ options = {
         'sharpening': False,
         'emboss': False,
         'inverse': False,
-        'multiple': True,
+        'multiple': False,
         'text': False,
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
@@ -135,7 +135,7 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 3,
+    'changeVideoStream': 40, #3,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -1284,6 +1284,9 @@ paused = False
 
 messages = []
 
+staggeredFrames = []
+staggeredFramesCount = 4
+
 # main loop
 while True:
 
@@ -1329,6 +1332,21 @@ while True:
                 effects.put(nextFrame)
             else:
                 frame = effects.apply(frame)
+
+        # NOTE: staggered test
+        resizeFactor = 1/staggeredFramesCount
+        smallFrame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
+        if len(staggeredFrames) >= staggeredFramesCount*staggeredFramesCount:
+            # remove elements from beginning
+            n = staggeredFramesCount*staggeredFramesCount+1-len(staggeredFrames)
+            del staggeredFrames[:n]
+        staggeredFrames.append(smallFrame)
+        if len(staggeredFrames) >= staggeredFramesCount*staggeredFramesCount:
+            frameLines = []
+            for frameLine in np.array_split(staggeredFrames, staggeredFramesCount):
+                frameLines.append(np.concatenate(frameLine, axis=1))
+            frame = np.concatenate(frameLines, axis=0)
+            frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         if options['frameResize'] == 'post':
             frame = resizeFrame(frame)
