@@ -23,8 +23,9 @@ print("      5: toggle effect 'sharpening'")
 print("      6: toggle effect 'emboss'")
 print("      7: toggle effect 'inverse'")
 print("      8: toggle effect 'multiple'")
-print("      9: toggle effect 'text'")
-print("      0: toggle all effects")
+print("      9: toggle effect 'staggered'")
+print("      0: toggle effect 'text'")
+print("      a: toggle all effects")
 print('')
 print("      q: toggle FPS debug display")
 print("      w: toggle timing debug display")
@@ -36,8 +37,8 @@ print("      u: toggle bpm debug display")
 print("      i: toggle loudness debug display")
 print("      d: toggle all debug displays")
 print('')
-print("      a: toggle beat detection")
-print("      s: toggle onset detection")
+print("      f: toggle beat detection")
+print("      g: toggle onset detection")
 print('')
 print("      ,: decrease sensitivity")
 print("      .: increase sensitivity")
@@ -119,7 +120,8 @@ options = {
         'sharpening': False,
         'emboss': False,
         'inverse': False,
-        'multiple': False,
+        'multiple': True,
+        'staggered': True,
         'text': False,
     },
     'colorMaps': ["AUTUMN", "BONE", "JET", "WINTER", "RAINBOW", "OCEAN", "SUMMER", "SPRING", "COOL", "HSV", "PINK", "HOT"],
@@ -135,7 +137,7 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 40, #3,
+    'changeVideoStream': 10, #3,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -148,6 +150,8 @@ probabilities = {
     'unsetInverse': 12,
     'setMultiple': 100,
     'unsetMultiple': 60,
+    'setStaggered': 80,
+    'unsetStaggered': 80,
     'setText': 80,
 }
 
@@ -157,6 +161,8 @@ minVals = {
     'sharpening': 2,
     'emboss': 2,
     'text': 6,
+    'multiple': 2,
+    'staggered': 4,
 }
 maxVals = {
     'blur': 30,
@@ -164,6 +170,8 @@ maxVals = {
     'sharpening': 20,
     'emboss': 10,
     'text': 6,
+    'multiple': 6,
+    'staggered': 6,
 }
 
 
@@ -514,6 +522,7 @@ class EffectProcessor():
             'emboss': 0,
             'inverse': 0,
             'multiple': 0,
+            'staggered': 0,
             'text': 0,
         }
 
@@ -531,6 +540,8 @@ class EffectProcessor():
         self.luts = {
             'inverse': inverseLut[::-1]
         }
+
+        self.staggeredFrames = []
 
 
     def start(self):
@@ -598,33 +609,33 @@ class EffectProcessor():
             frame = cv2.filter2D(frame, -1, self.kernels['emboss'])
             self.options['emboss'] -= 1
 
-        # show frame multiple times
-        if self.active['multiple'] and self.options['multiple']:
+        # show frame multiple times (either staggered, or the same frame)
+        if self.active['staggered'] and self.options['staggered'] > 0:
+            # show staggered frames
 
-            if self.options['multiple'] == 2:
-                frame = cv2.resize(frame, (0,0), fx=0.5, fy=0.5) # resize two half the size
-                frame = np.concatenate((frame, frame), axis=0) # stack vertically
-                frame = np.concatenate((frame, frame), axis=1) # stack horizontally
+            resizeFactor = 1/self.options['staggered']
+            smallFrame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
+            if len(self.staggeredFrames) >= self.options['staggered']*self.options['staggered']:
+                # remove elements from beginning
+                n = self.options['staggered']*self.options['staggered']+1-len(self.staggeredFrames)
+                del self.staggeredFrames[:n]
+            self.staggeredFrames.append(smallFrame)
 
-            elif self.options['multiple'] == 3:
-                frame = cv2.resize(frame, (0,0), fx=0.335, fy=0.335)
-                frame = np.concatenate((frame, frame, frame), axis=0)
-                frame = np.concatenate((frame, frame, frame), axis=1)
+            if len(self.staggeredFrames) >= self.options['staggered']*self.options['staggered']:
+                # if we have enough frames, show grid:
+                reverseStaggeredFrames = self.staggeredFrames[::-1]
+                frameLines = np.array_split(reverseStaggeredFrames, self.options['staggered'])
+                frameLines = np.concatenate(frameLines, axis=1) # TODO: sometimes we have a 'numpy.AxisError: axis 1 is out of bounds for array of dimension 1' error here, I'm not sure why this happens (array is only one-dimensional in some cases?)
+                frame = np.concatenate(frameLines, axis=1)
+                frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
-            elif self.options['multiple'] == 4:
-                frame = cv2.resize(frame, (0,0), fx=0.25, fy=0.25)
-                frame = np.concatenate((frame, frame, frame, frame), axis=0)
-                frame = np.concatenate((frame, frame, frame, frame), axis=1)
+        elif self.active['multiple'] and self.options['multiple']:
+            # show same frame multiple times
 
-            elif self.options['multiple'] == 5:
-                frame = cv2.resize(frame, (0,0), fx=0.2, fy=0.2)
-                frame = np.concatenate((frame, frame, frame, frame, frame), axis=0)
-                frame = np.concatenate((frame, frame, frame, frame, frame), axis=1)
-
-            elif self.options['multiple'] == 6:
-                frame = cv2.resize(frame, (0,0), fx=0.168, fy=0.168)
-                frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=0)
-                frame = np.concatenate((frame, frame, frame, frame, frame, frame), axis=1)
+            resizeFactor = 1/self.options['multiple']
+            frame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
+            frame = np.concatenate( [frame]*self.options['multiple'], axis=1)
+            frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
 
             frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
@@ -670,6 +681,8 @@ class EffectProcessor():
             effectCheck = 'inverse'
         elif effect == 'unMultiple':
             effectCheck = 'multiple'
+        elif effect == 'unStaggered':
+            effectCheck = 'staggered'
 
         if not self.active[effectCheck]:
             if options['verbose']:
@@ -724,15 +737,21 @@ class EffectProcessor():
 
         # set multiple
         elif effect == 'multiple':
-            if random.randint(0,10) > 7:
-                self.options['multiple'] = random.randint(2, 3)
-            else:
-                self.options['multiple'] = random.randint(4, 6)
+            self.options['multiple'] = random.randint(minVals['multiple'], maxVals['multiple'])
             if options['verbose']: print('set multiple to '+str(self.options['multiple']))
         # unset multiple
         elif effect == 'unMultiple':
             self.options['multiple'] = 0
             if options['verbose']: print('reset multiple')
+
+        # set staggered
+        elif effect == 'staggered':
+            self.options['staggered'] = random.randint(minVals['staggered'], maxVals['staggered'])
+            if options['verbose']: print('set staggered to '+str(self.options['staggered']))
+        # unset staggered
+        elif effect == 'unStaggered':
+            self.options['staggered'] = 0
+            if options['verbose']: print('reset staggered')
 
         # set text
         elif effect == 'text':
@@ -805,6 +824,12 @@ class EffectProcessor():
             self.activate('unMultiple')
         elif probabilityCheck('setMultiple'):
             self.activate('multiple')
+
+        # set staggered
+        if self.options['staggered'] and probabilityCheck('unsetStaggered'):
+            self.activate('unStaggered')
+        elif probabilityCheck('setStaggered'):
+            self.activate('staggered')
 
         # set text
         if probabilityCheck('setText'):
@@ -1010,11 +1035,11 @@ def debugDisplay( im, onset ):
             elif key == 'inverse':
                 text = 'inv'
             elif key == 'multiple':
-                val -= 1
-                if val < 0:
-                    val = 0
-                maxVal = 5
+                maxVal = maxVals['multiple']
                 text = 'mult'
+            elif key == 'staggered':
+                maxVal = maxVals['staggered']
+                text = 'stag'
 
             filledPercent = val/maxVal
 
@@ -1284,9 +1309,6 @@ paused = False
 
 messages = []
 
-staggeredFrames = []
-staggeredFramesCount = 5
-
 # main loop
 while True:
 
@@ -1332,20 +1354,6 @@ while True:
                 effects.put(nextFrame)
             else:
                 frame = effects.apply(frame)
-
-        # NOTE: staggered test
-        resizeFactor = 1/staggeredFramesCount
-        smallFrame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
-        if len(staggeredFrames) >= staggeredFramesCount*staggeredFramesCount:
-            # remove elements from beginning
-            n = staggeredFramesCount*staggeredFramesCount+1-len(staggeredFrames)
-            del staggeredFrames[:n]
-        staggeredFrames.append(smallFrame)
-        if len(staggeredFrames) >= staggeredFramesCount*staggeredFramesCount:
-            frameLines = np.array_split(staggeredFrames[::-1], staggeredFramesCount)
-            frameLines = np.concatenate(frameLines, axis=1)
-            frame = np.concatenate(frameLines, axis=1)
-            frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         if options['frameResize'] == 'post':
             frame = resizeFrame(frame)
@@ -1407,9 +1415,6 @@ while True:
         newMessage('change random videostream input')
         videostreams.changeVideostreamInput()
 
-    elif key&0xFF == ord('0'):
-        newMessage('toggle all effects')
-        effects.toggle('all')
     elif key&0xFF == ord('1'):
         newMessage('toggle colorMap effect')
         effects.toggle('colorMap')
@@ -1435,8 +1440,14 @@ while True:
         newMessage('toggle multiple effect')
         effects.toggle('multiple')
     elif key&0xFF == ord('9'):
+        newMessage('toggle staggered effect')
+        effects.toggle('staggered')
+    elif key&0xFF == ord('0'):
         newMessage('toggle text effect')
         effects.toggle('text')
+    elif key&0xFF == ord('a'):
+        newMessage('toggle all effects')
+        effects.toggle('all')
 
     elif key&0xFF == ord('q'):
         newMessage('toggle fps debug display')
@@ -1482,10 +1493,10 @@ while True:
         options['debugBpm'] = newBool
         options['debugLoudness'] = newBool
 
-    elif key&0xFF == ord('a'):
+    elif key&0xFF == ord('f'):
         options['detectBeat'] = not options['detectBeat']
         newMessage('set beat detection to '+str(options['detectBeat']))
-    elif key&0xFF == ord('s'):
+    elif key&0xFF == ord('g'):
         options['detectOnset'] = not options['detectOnset']
         newMessage('set onset detection to '+str(options['detectOnset']))
 
