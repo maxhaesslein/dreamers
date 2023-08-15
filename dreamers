@@ -839,8 +839,6 @@ class AudioProcessor:
         self.running = True
         self.queue = Queue()
 
-        self.fpsMeasurement = options['fps']
-
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
@@ -853,7 +851,8 @@ class AudioProcessor:
                                     channels=audioOptions['inputChannels'],
                                     input_device_index=audioOptions['deviceIndex'],
                                     frames_per_buffer=self.bufferSize,
-                                    rate=audioOptions['sampleRate'])
+                                    rate=audioOptions['sampleRate'],
+                                    stream_callback=self.readAudioFrames)
 
         hop_s = self.bufferSize
         win_s = hop_s * 2
@@ -864,61 +863,46 @@ class AudioProcessor:
 
 
     def start(self):
-        t = Thread(target=self.update, args=())
-        t.daemon = True
-        t.start()
         return self
 
 
-    def update(self):
+    def readAudioFrames( self, in_data, frame_count, time_info, status ):
 
-        previousTime = currentTime = time.time()
+        signal = np.frombuffer(in_data, dtype=np.float32)
 
-        while self.running:
+        beat = False
 
-            # available frames: self.stream.get_read_available()
-            audiobuffer = self.stream.read(num_frames=self.bufferSize, exception_on_overflow=False)
-            signal = np.frombuffer(audiobuffer, dtype=np.float32)
+        tempo = self.tempo(signal)
+        if tempo:
+            beat = True
 
-            beat = False
+        peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
-            tempo = self.tempo(signal)
-            if tempo:
-                beat = True
+        self.peakBuffer[self.peakBufferIndex] = peak
+        self.peakBufferOnset[self.peakBufferIndex] = beat
 
-            peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+        self.peakBufferIndex += 1
+        if self.peakBufferIndex >= len(self.peakBuffer):
+            self.peakBufferIndex = 0
 
-            self.peakBuffer[self.peakBufferIndex] = peak
-            self.peakBufferOnset[self.peakBufferIndex] = beat
+        if beat:
+            self.queue.put(True)
 
-            self.peakBufferIndex += 1
-            if self.peakBufferIndex >= len(self.peakBuffer):
-                self.peakBufferIndex = 0
-
-            if beat:
-                self.queue.put(True)
-
-            previousTime, currentTime = currentTime, time.time()
-            fps = math.ceil(1./(currentTime-previousTime))
-            self.fpsMeasurement = (self.fpsMeasurement * options['fpsSmoothing']) + (fps * (1.0-options['fpsSmoothing']))
+        return (in_data, pyaudio.paContinue)
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement, self.tempo.get_bpm()
+        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.tempo.get_bpm()
 
 
-    def isOnset(self):
+    def isBeat(self):
 
         if self.queue.qsize() > 0:
             return self.queue.get()
 
         return False
 
-
     def stop(self):
-
-        self.running = False
-
         self.stream.stop_stream()
         self.stream.close()
         self.audio.terminate()
@@ -1087,7 +1071,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index, audioFpsMeasurement, bpm = audio.getInfo()
+        data, onsetData, index, bpm = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -1115,13 +1099,6 @@ def debugDisplay( im, onset ):
                 x = 0
 
         color = (255,255,255)
-
-
-        text = 'Audio FPS: '+str(int(audioFpsMeasurement))
-        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
-
-        textX += 30
 
 
         text = 'BPM: '+str(int(bpm))+'/'+str(int(bpm*2))
@@ -1243,8 +1220,6 @@ while True:
 
     if paused:
 
-        void = audio.isOnset()
-
         frame = lastFrame.copy()
 
         font = cv2.FONT_HERSHEY_TRIPLEX
@@ -1285,7 +1260,7 @@ while True:
         if options['frameResize'] == 'post':
             frame = resizeFrame(frame)
 
-        onset = audio.isOnset()
+        onset = audio.isBeat()
 
     frame = debugDisplay(frame, onset)
 
