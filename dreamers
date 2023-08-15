@@ -33,12 +33,7 @@ print("      e: toggle videostreams debug display")
 print("      r: toggle effects debug display")
 print("      t: toggle audio debug display")
 print("      z: toggle onset debug display")
-print("      u: toggle bpm debug display")
-print("      i: toggle loudness debug display")
 print("      d: toggle all debug displays")
-print('')
-print("      f: toggle beat detection")
-print("      g: toggle onset detection")
 print('')
 print("      ,: decrease sensitivity")
 print("      .: increase sensitivity")
@@ -70,8 +65,6 @@ options = {
     'debugEffects': False,
     'debugAudio': False,
     'debugOnset': False,
-    'debugBpm': False,
-    'debugLoudness': False,
 
     'verbose': True,
 
@@ -89,9 +82,6 @@ options = {
 
     'grayscale': False,
 
-    'detectOnset': True,
-    'detectBeat': True,
-
     'videostreamCount': 20, # use ~10 for 2 GB RAM, ~20 for 4 GB RAM
     'videostreamMaxQueueSize': 20,
 
@@ -106,10 +96,9 @@ options = {
     'debugFont': cv2.FONT_HERSHEY_COMPLEX_SMALL,
 
     'audioDevice': 'auto',
-    'audioOnsetMethod': 'specflux', # see https://aubio.org/doc/latest/specdesc_8h.html
-    'audioDisplayScaling': 10000,
+    'audioDisplayScaling': 3000,
 
-    'initSleepTime': 5, # in seconds, sleep time after loading videostreams before starting main loop
+    'initSleepTime': 3, # in seconds, sleep time after loading videostreams before starting main loop
 
 
     'effectsActiveList': {
@@ -137,7 +126,7 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 10, #3,
+    'changeVideoStream': 3,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -148,10 +137,10 @@ probabilities = {
     'setEmboss': 125,
     'setInverse': 80,
     'unsetInverse': 12,
-    'setMultiple': 100,
+    'setMultiple': 120,
     'unsetMultiple': 60,
-    'setStaggered': 80,
-    'unsetStaggered': 80,
+    'setStaggered': 120,
+    'unsetStaggered': 60,
     'setText': 80,
 }
 
@@ -277,9 +266,6 @@ audioOptions = {
     'sampleRate': int(audioDevice['defaultSampleRate']),
     'bufferSize': int(audioDevice['defaultSampleRate']/options['fps']),
     'inputChannels': 1,
-    'format': pyaudio.paFloat32,
-    'npFormat': np.int16,
-    'onsetMethod': options['audioOnsetMethod']
 }
 
 
@@ -848,6 +834,7 @@ class EffectProcessor():
 
 
 class AudioProcessor:
+
     def __init__(self):
 
         self.running = True
@@ -858,24 +845,21 @@ class AudioProcessor:
         self.peakBuffer = np.zeros(options['fps'])
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
-        self.loudness = 0
-
-        win_s = audioOptions['bufferSize']*2
-        hop_s = int(win_s // 2)
 
         self.audio = pyaudio.PyAudio()
-        self.stream = self.audio.open(format=audioOptions['format'],
+        self.stream = self.audio.open(format=pyaudio.paFloat32,
                                     input=True,
                                     channels=audioOptions['inputChannels'],
                                     input_device_index=audioOptions['deviceIndex'],
                                     frames_per_buffer=audioOptions['bufferSize'],
                                     rate=audioOptions['sampleRate'])
 
-        self.onsetDetection = aubio.onset(method=audioOptions['onsetMethod'], buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
-        self.tempoDetection = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
+        hop_s = audioOptions['bufferSize']
+        win_s = hop_s*2
+        self.tempo = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
 
         if options['verbose']:
-            print('start aubio onset and beat detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(win_s)+' / hop_s: '+str(hop_s)+' / onsetMethod: '+str(audioOptions['onsetMethod']))
+            print('start aubio tempo detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(win_s)+' / hop_s: '+str(hop_s))
 
 
     def start(self):
@@ -898,28 +882,22 @@ class AudioProcessor:
             audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
             signal = np.frombuffer(audiobuffer, dtype=np.float32)
 
-            onset = False
-            if options['detectOnset']:
-                onsetDet = self.onsetDetection(signal)
-                if onsetDet:
-                    onset = True
+            beat = False
 
-            if options['detectBeat']:
-                tempo = self.tempoDetection(signal)
-                if tempo:
-                    onset = True
+            tempo = self.tempo(signal)
+            if tempo:
+                beat = True
 
             peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
             self.peakBuffer[self.peakBufferIndex] = peak
-            self.peakBufferOnset[self.peakBufferIndex] = onset
+            self.peakBufferOnset[self.peakBufferIndex] = beat
 
             self.peakBufferIndex += 1
             if self.peakBufferIndex >= len(self.peakBuffer):
                 self.peakBufferIndex = 0
 
-
-            if onset:
+            if beat:
                 self.queue.put(True)
 
             usedTime = time.time() - startTime
@@ -935,11 +913,7 @@ class AudioProcessor:
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement
-
-
-    def getLoudness(self):
-        return np.mean(self.peakBuffer)
+        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.fpsMeasurement, self.tempo.get_bpm()
 
 
     def isOnset(self):
@@ -1122,7 +1096,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index, audioFpsMeasurement = audio.getInfo()
+        data, onsetData, index, audioFpsMeasurement, bpm = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -1155,7 +1129,16 @@ def debugDisplay( im, onset ):
         elif audioFpsMeasurement < options['fps']*0.9:
             color = (0,255,255)
 
+
         text = 'Audio FPS: '+str(int(audioFpsMeasurement))
+        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
+        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
+
+        textX += 30
+
+
+        color = (255,255,255)
+        text = 'BPM: '+str(int(bpm))+'/'+str(int(bpm*2))+'/'+str(int(bpm*3))+'/'+str(int(bpm*4))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
@@ -1176,42 +1159,6 @@ def debugDisplay( im, onset ):
             color = (0,0,255)
 
         drawDebugRect( im, x, y, w, h, filledPercent, color )
-
-
-    if options['debugBpm']:
-
-        bpmInt = int(bpm)
-        averageBpmInt = int(averageBpm)
-
-        sep = '='
-        if bpmInt < averageBpmInt:
-            sep = '<'
-        elif bpmInt > averageBpmInt:
-            sep = '>'
-
-        text = 'BPM: '+str(bpmInt)+' '+sep+' '+str(averageBpmInt)
-        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
-
-        textX += 30
-
-
-    if options['debugLoudness']:
-
-        loudnessInt = int(loudness)
-        averageLoudnessInt = int(averageLoudness)
-
-        sep = '='
-        if loudnessInt < averageLoudnessInt:
-            sep = '<'
-        elif loudnessInt > averageLoudnessInt:
-            sep = '>'
-
-        text = 'Loudness: '+str(loudnessInt)+' '+sep+' '+str(averageLoudnessInt)
-        textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
-        cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, (255,255,255), 1, cv2.LINE_AA )
-
-        textX += 30
 
 
     return im
@@ -1299,15 +1246,6 @@ additionalFrameTime = 0
 frameCountIn30Seconds = options['fps']*30
 frameCountIn10Seconds = options['fps']*10
 
-beatList = np.zeros(frameCountIn30Seconds)
-bpm = 0
-averageBpm = 0
-bpmList = np.zeros(frameCountIn10Seconds)
-
-loudness = 0
-averageLoudness = 0
-loudnessList = np.zeros(frameCountIn10Seconds)
-
 paused = False
 
 messages = []
@@ -1362,23 +1300,6 @@ while True:
             frame = resizeFrame(frame)
 
         onset = audio.isOnset()
-        loudness = audio.getLoudness()
-
-        listIndex30 = frameNumber%frameCountIn30Seconds
-        if onset:
-            beatList[listIndex30] = 1
-        else:
-            beatList[listIndex30] = 0
-
-        bpm = np.count_nonzero(beatList)*2 # beatList has a length of 30 seconds, so we multiply by 2 to get the beats per 60 seconds / 1 minute
-
-        listIndex10 = frameNumber%frameCountIn10Seconds
-        bpmList[listIndex10] = bpm
-        loudnessList[listIndex10] = loudness
-
-        averageLoudness = np.mean(loudnessList)
-        averageBpm = np.mean(bpmList)
-
 
     frame = debugDisplay(frame, onset)
 
@@ -1470,12 +1391,6 @@ while True:
     elif key&0xFF == ord('z'):
         newMessage('toggle onset debug display')
         options['debugOnset'] = not options['debugOnset']
-    elif key&0xFF == ord('u'):
-        newMessage('toggle bpm debug display')
-        options['debugBpm'] = not options['debugBpm']
-    elif key&0xFF == ord('i'):
-        newMessage('toggle loudness debug display')
-        options['debugLoudness'] = not options['debugLoudness']
 
     elif key&0xFF == ord('p'):
         paused = not paused
@@ -1493,15 +1408,6 @@ while True:
         options['debugEffects'] = newBool
         options['debugAudio'] = newBool
         options['debugOnset'] = newBool
-        options['debugBpm'] = newBool
-        options['debugLoudness'] = newBool
-
-    elif key&0xFF == ord('f'):
-        options['detectBeat'] = not options['detectBeat']
-        newMessage('set beat detection to '+str(options['detectBeat']))
-    elif key&0xFF == ord('g'):
-        options['detectOnset'] = not options['detectOnset']
-        newMessage('set onset detection to '+str(options['detectOnset']))
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
