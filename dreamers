@@ -13,7 +13,7 @@ print("    THE DREAMERS v.4")
 print("")
 #print("    q: quit and shutdown")
 print("    esc: exit to console")
-print("  space: fake onset")
+print("  space: fake beat")
 print('')
 print("      1: toggle effect 'colorMap'")
 print("      2: toggle effect 'blur'")
@@ -32,7 +32,7 @@ print("      w: toggle timing debug display")
 print("      e: toggle videostreams debug display")
 print("      r: toggle effects debug display")
 print("      t: toggle audio debug display")
-print("      z: toggle onset debug display")
+print("      z: toggle beat debug display")
 print("      d: toggle all debug displays")
 print('')
 print("      ,: decrease sensitivity")
@@ -64,7 +64,7 @@ options = {
     'debugStreams': False,
     'debugEffects': False,
     'debugAudio': False,
-    'debugOnset': False,
+    'debugBeat': False,
 
     'verbose': True,
 
@@ -126,7 +126,7 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 3,
+    'changeVideoStream': 2,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -140,7 +140,7 @@ probabilities = {
     'setMultiple': 120,
     'unsetMultiple': 60,
     'setStaggered': 120,
-    'unsetStaggered': 60,
+    'unsetStaggered': 20,
     'setText': 80,
 }
 
@@ -471,7 +471,7 @@ class VideostreamProcessor():
         return self.index, infos, self.fpsMeasurement
 
 
-    def onset(self):
+    def beat(self):
 
         if not probabilityCheck('changeVideoStream'):
             return
@@ -773,7 +773,7 @@ class EffectProcessor():
             print('set effect '+str(effect)+' to '+str(self.active[effect]))
 
 
-    def onset(self):
+    def beat(self):
 
         # set colormap
         if probabilityCheck('changeColorMap'):
@@ -828,6 +828,10 @@ class EffectProcessor():
         return self.active, self.options, self.fpsMeasurement
 
 
+    def getActive(self):
+        return self.options
+
+
     def stop(self):
         self.running = False
 
@@ -840,7 +844,7 @@ class AudioProcessor:
         self.queue = Queue()
 
         self.peakBuffer = np.zeros(options['fps'])
-        self.peakBufferOnset = np.zeros(options['fps'])
+        self.peakBufferBeat = np.zeros(options['fps'])
         self.peakBufferIndex = 0
 
         self.bufferSize = 1024
@@ -879,7 +883,7 @@ class AudioProcessor:
         peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
 
         self.peakBuffer[self.peakBufferIndex] = peak
-        self.peakBufferOnset[self.peakBufferIndex] = beat
+        self.peakBufferBeat[self.peakBufferIndex] = beat
 
         self.peakBufferIndex += 1
         if self.peakBufferIndex >= len(self.peakBuffer):
@@ -892,7 +896,7 @@ class AudioProcessor:
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferOnset, self.peakBufferIndex, self.tempo.get_bpm()
+        return self.peakBuffer, self.peakBufferBeat, self.peakBufferIndex, self.tempo.get_bpm()
 
 
     def isBeat(self):
@@ -916,7 +920,7 @@ def probabilityCheck( key ):
         return False
 
 
-def debugDisplay( im, onset ):
+def debugDisplay( im, beat ):
 
     textX = 30
 
@@ -1071,7 +1075,7 @@ def debugDisplay( im, onset ):
 
     if options['debugAudio']:
 
-        data, onsetData, index, bpm = audio.getInfo()
+        data, beatData, index, bpm = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -1082,7 +1086,7 @@ def debugDisplay( im, onset ):
 
         for i in range(len(data)):
             h = int(data[index])
-            o = onsetData[index]
+            o = beatData[index]
 
             color = (255,255,255)
             if o:
@@ -1108,7 +1112,7 @@ def debugDisplay( im, onset ):
         textX += 30
 
 
-    if options['debugOnset']:
+    if options['debugBeat']:
 
         w = 100
         h = 100
@@ -1117,7 +1121,7 @@ def debugDisplay( im, onset ):
 
         filledPercent = 0.0
         color = (255,255,255)
-        if onset:
+        if beat:
             filledPercent = 1.0
             color = (0,0,255)
 
@@ -1260,9 +1264,9 @@ while True:
         if options['frameResize'] == 'post':
             frame = resizeFrame(frame)
 
-        onset = audio.isBeat()
+        beat = audio.isBeat()
 
-    frame = debugDisplay(frame, onset)
+    frame = debugDisplay(frame, beat)
 
     if len(messages) > 0:
         frame = messagesDisplay(frame, messages)
@@ -1290,7 +1294,7 @@ while True:
 
     elif key == 32: # space
         newMessage('fake beat')
-        onset = True
+        beat = True
 
     elif key&0xFF == ord('i'):
         newMessage('change random videostream index')
@@ -1350,8 +1354,8 @@ while True:
         newMessage('toggle audio debug display')
         options['debugAudio'] = not options['debugAudio']
     elif key&0xFF == ord('z'):
-        newMessage('toggle onset debug display')
-        options['debugOnset'] = not options['debugOnset']
+        newMessage('toggle beat debug display')
+        options['debugBeat'] = not options['debugBeat']
 
     elif key&0xFF == ord('p'):
         paused = not paused
@@ -1368,7 +1372,7 @@ while True:
         options['debugStreams'] = newBool
         options['debugEffects'] = newBool
         options['debugAudio'] = newBool
-        options['debugOnset'] = newBool
+        options['debugBeat'] = newBool
 
     elif key&0xFF == ord(','):
         options['sensitivity'] -= 0.05
@@ -1385,11 +1389,14 @@ while True:
             print('set sensitivity to '+str(options['sensitivity']))
         newMessage('increase sensitivity to '+str(options['sensitivity']))
 
-    if onset:
-        videostreams.onset()
-
+    if beat:
         if options['effectsActive']:
-            effects.onset()
+            effects.beat()
+
+        activeEffects = effects.getActive()
+        if not activeEffects['staggered']: # NOTE: don't switch videostreams, if 'staggered' effect is active
+            videostreams.beat()
+
 
     frameNumber += 1
 
