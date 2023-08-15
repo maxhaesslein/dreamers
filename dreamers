@@ -340,12 +340,6 @@ class VideostreamProcessor():
 
         videoIn = cv2.VideoCapture(options['videoPath']+videoFile)
 
-        # we currently start always at the beginning of the video; seeking may add framedrops
-        #maxFrameCount = videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
-        #if maxFrameCount > 100:
-        #    startFrame = random.randint(0, maxFrameCount-100)
-        #    videoIn.set( cv2.CAP_PROP_POS_FRAMES, startFrame )
-
         if options['verbose']:
             print('loading new video "'+str(videoFile)+'" ('+str(len(self.videos))+' videos left in list)')
 
