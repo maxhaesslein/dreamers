@@ -86,7 +86,7 @@ options = {
     'videostreamMaxQueueSize': 20,
 
 
-    'sensitivity': 0.7, # lower means slower, higher means faster; 0.1 - 2.0
+    'sensitivity': 0.3, # lower means slower, higher means faster; 0.1 - 2.0
 
     'windowName': 'The Dreamers',
 
@@ -98,7 +98,7 @@ options = {
     'audioDevice': 'auto',
     'audioDisplayScaling': 3000,
 
-    'initSleepTime': 3, # in seconds, sleep time after loading videostreams before starting main loop
+    'initSleepTime': 5, # in seconds, sleep time after loading videostreams before starting main loop
 
 
     'effectsActiveList': {
@@ -264,7 +264,6 @@ if audioDevice['maxInputChannels'] <= 0:
 audioOptions = {
     'deviceIndex': audioDevice['index'],
     'sampleRate': int(audioDevice['defaultSampleRate']),
-    'bufferSize': int(audioDevice['defaultSampleRate']/options['fps']),
     'inputChannels': 1,
 }
 
@@ -846,20 +845,22 @@ class AudioProcessor:
         self.peakBufferOnset = np.zeros(options['fps'])
         self.peakBufferIndex = 0
 
+        self.bufferSize = 1024
+
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format=pyaudio.paFloat32,
                                     input=True,
                                     channels=audioOptions['inputChannels'],
                                     input_device_index=audioOptions['deviceIndex'],
-                                    frames_per_buffer=audioOptions['bufferSize'],
+                                    frames_per_buffer=self.bufferSize,
                                     rate=audioOptions['sampleRate'])
 
-        hop_s = audioOptions['bufferSize']
-        win_s = hop_s*2
+        hop_s = self.bufferSize
+        win_s = hop_s * 2
         self.tempo = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
 
         if options['verbose']:
-            print('start aubio tempo detection with buffersize: '+str(audioOptions['bufferSize'])+' / deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / win_s: '+str(win_s)+' / hop_s: '+str(hop_s))
+            print('start aubio tempo detection with deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / buffersize: '+str(self.bufferSize)+' / hop_s: '+str(hop_s))
 
 
     def start(self):
@@ -872,14 +873,11 @@ class AudioProcessor:
     def update(self):
 
         previousTime = currentTime = time.time()
-        targetTime = 1./options['fps']
 
         while self.running:
 
-            startTime = time.time()
-
             # available frames: self.stream.get_read_available()
-            audiobuffer = self.stream.read(num_frames=audioOptions['bufferSize'], exception_on_overflow=False)
+            audiobuffer = self.stream.read(num_frames=self.bufferSize, exception_on_overflow=False)
             signal = np.frombuffer(audiobuffer, dtype=np.float32)
 
             beat = False
@@ -899,13 +897,6 @@ class AudioProcessor:
 
             if beat:
                 self.queue.put(True)
-
-            usedTime = time.time() - startTime
-            timeLeft = targetTime-usedTime
-            if timeLeft < 0:
-                timeLeft = 0
-
-            time.sleep(timeLeft)
 
             previousTime, currentTime = currentTime, time.time()
             fps = math.ceil(1./(currentTime-previousTime))
@@ -1123,11 +1114,7 @@ def debugDisplay( im, onset ):
             if x >= options['screenWidth']:
                 x = 0
 
-        color = (0,255,0)
-        if audioFpsMeasurement < options['fps']*0.8:
-            color = (0,0,255)
-        elif audioFpsMeasurement < options['fps']*0.9:
-            color = (0,255,255)
+        color = (255,255,255)
 
 
         text = 'Audio FPS: '+str(int(audioFpsMeasurement))
@@ -1137,8 +1124,7 @@ def debugDisplay( im, onset ):
         textX += 30
 
 
-        color = (255,255,255)
-        text = 'BPM: '+str(int(bpm))+'/'+str(int(bpm*2))+'/'+str(int(bpm*3))+'/'+str(int(bpm*4))
+        text = 'BPM: '+str(int(bpm))+'/'+str(int(bpm*2))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
