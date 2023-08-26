@@ -593,6 +593,10 @@ class EffectProcessor():
             # show staggered frames
 
             resizeFactor = 1/self.options['staggered']
+
+            if self.options['staggered'] == 3 or self.options['staggered'] == 5:
+                resizeFactor *= 1.02
+
             smallFrame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
             if len(self.staggeredFrames) >= self.options['staggered']*self.options['staggered']:
                 # remove elements from beginning
@@ -612,6 +616,10 @@ class EffectProcessor():
             # show same frame multiple times
 
             resizeFactor = 1/self.options['multiple']
+
+            if self.options['multiple'] == 3 or self.options['multiple'] == 5:
+                resizeFactor *= 1.02
+
             frame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
             frame = np.concatenate( [frame]*self.options['multiple'], axis=1)
             frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
@@ -837,11 +845,12 @@ class AudioProcessor:
         self.running = True
         self.queue = Queue()
 
-        self.peakBuffer = np.zeros(options['fps'])
-        self.peakBufferBeat = np.zeros(options['fps'])
+        self.bufferSize = 512
+
+        self.peakBuffer = np.zeros(options['fps']) # TODO: this will not work any more, because we run with a much higher framerate (~178 fps), so we need many more samples worth of buffer here; 1 second worth should be the target; this should be something like audioOptions['sampleRate']/self.bufferSize ?
+        self.peakBufferBeat = np.zeros(options['fps']) # TODO: see above; could be self.peakBuffer.copy() ?
         self.peakBufferIndex = 0
 
-        self.bufferSize = 1024
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format=pyaudio.paFloat32,
