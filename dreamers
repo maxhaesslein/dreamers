@@ -127,6 +127,7 @@ options = {
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
     'changeVideoStream': 2,
+    'changeVideoStreamInput': 4,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -347,6 +348,7 @@ class VideostreamProcessor():
             'queue': Queue(maxsize=options['videostreamMaxQueueSize']),
             'videoIn': videoIn,
             'videofile': videoFile,
+            'evictVideo': False, # flag stream for video change
         }
 
         return stream
@@ -397,6 +399,7 @@ class VideostreamProcessor():
 
         if ret == False:
             # no more frames left, loop video
+            stream['evictVideo'] = True # force this video to be changed soon
             stream['videoIn'].set(cv2.CAP_PROP_POS_FRAMES, 0)
             return
 
@@ -419,8 +422,8 @@ class VideostreamProcessor():
                 randomIndex = 0
             if randomIndex == self.index:
                 continue
-            if self.streams[randomIndex]['queue'].qsize() >= 5:
-                # find a stream that has at least 5 frames in its queue, then break
+            if self.streams[randomIndex]['queue'].qsize() >= 5 and not self.streams[randomIndex]['evictVideo']:
+                # find a stream that has at least 5 frames in its queue and will not be evicted, then break
                 break
 
         self.index = randomIndex
@@ -430,15 +433,22 @@ class VideostreamProcessor():
     def changeVideostreamInput(self, streamIndex = False):
 
         if streamIndex == False:
+            # check if there is a video that needs eviction
+            for i, stream in enumerate(self.streams):
+                if stream['evictVideo']:
+                    streamIndex = i
+                    break
+
+        if streamIndex == False:
             streamIndex = random.randint(0, options['videostreamCount']-1)
 
         if streamIndex == self.index:
             # don't change current stream, just abort here
             return
 
-        # close old stream
         if options['verbose']:
             print('change video on stream', streamIndex)
+
         self.streams[streamIndex] = self.loadVideo()
 
 
@@ -467,14 +477,11 @@ class VideostreamProcessor():
 
     def beat(self):
 
-        if not probabilityCheck('changeVideoStream'):
-            return
+        if probabilityCheck('changeVideoStream'):
+            self.changeVideostreamIndex()
 
-        oldStream = self.index
-
-        self.changeVideostreamIndex()
-
-        self.changeVideostreamInput(oldStream)
+        if probabilityCheck('changeVideoStreamInput'):
+            self.changeVideostreamInput()
 
 
 class EffectProcessor():
@@ -849,7 +856,6 @@ class AudioProcessor:
         self.bufferSize = 512
 
         peakBufferSize = int(audioOptions['sampleRate']/self.bufferSize)
-        print("PEAK BUFFER SIZE "+str(peakBufferSize))
 
         self.peakBuffer = np.zeros(peakBufferSize)
         self.peakBufferBeat = np.zeros(peakBufferSize)
@@ -870,7 +876,7 @@ class AudioProcessor:
         self.tempo = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
 
         if options['verbose']:
-            print('start aubio tempo detection with deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / buffersize: '+str(self.bufferSize)+' / hop_s: '+str(hop_s))
+            print('start aubio tempo detection with deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / buffersize: '+str(self.bufferSize)+' / hop_s: '+str(hop_s)+' / peakBufferSize: '+str(peakBufferSize))
 
 
     def start(self):
