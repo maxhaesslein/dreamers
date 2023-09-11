@@ -856,12 +856,16 @@ class AudioProcessor:
 
         self.bufferSize = 512
 
-        peakBufferSize = int(audioOptions['sampleRate']/self.bufferSize)
-
+        peakBufferSize = int(audioOptions['sampleRate']/self.bufferSize) # one second worth of bufferSizes
         self.peakBuffer = np.zeros(peakBufferSize)
         self.peakBufferBeat = np.zeros(peakBufferSize)
         self.peakBufferIndex = 0
 
+        volumeBufferSize = int((audioOptions['sampleRate']/self.bufferSize)/options['fps']) # one frame worth of bufferSizes
+        if volumeBufferSize < 1:
+            volumeBufferSize = 1
+        self.volumeBuffer = np.zeros(volumeBufferSize)
+        self.volumeBufferIndex = 0
 
         self.audio = pyaudio.PyAudio()
         self.stream = self.audio.open(format=pyaudio.paFloat32,
@@ -877,7 +881,7 @@ class AudioProcessor:
         self.tempo = aubio.tempo(method='default', buf_size=win_s, hop_size=hop_s, samplerate=audioOptions['sampleRate'])
 
         if options['verbose']:
-            print('start aubio tempo detection with deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / buffersize: '+str(self.bufferSize)+' / hop_s: '+str(hop_s)+' / peakBufferSize: '+str(peakBufferSize))
+            print('start aubio tempo detection with deviceid: '+str(audioOptions['deviceIndex'])+' / samplerate: '+str(audioOptions['sampleRate'])+' / buffersize: '+str(self.bufferSize)+' / hop_s: '+str(hop_s)+' / peakBufferSize: '+str(peakBufferSize)+' / volumeBufferSize: '+str(volumeBufferSize))
 
 
     def start(self):
@@ -897,14 +901,21 @@ class AudioProcessor:
         if tempo:
             beat = True
 
-        peak = np.abs(np.max(signal)-np.min(signal))*options['audioDisplayScaling']
+        volume = np.sum(signal**2)/len(signal)
 
-        self.peakBuffer[self.peakBufferIndex] = peak
+        peak = np.abs(np.max(signal)-np.min(signal))
+        self.peakBuffer[self.peakBufferIndex] = peak*options['audioDisplayScaling']
         self.peakBufferBeat[self.peakBufferIndex] = beat
 
         self.peakBufferIndex += 1
         if self.peakBufferIndex >= len(self.peakBuffer):
             self.peakBufferIndex = 0
+
+        self.volumeBuffer[self.volumeBufferIndex] = volume
+
+        self.volumeBufferIndex += 1
+        if self.volumeBufferIndex >= len(self.volumeBuffer):
+            self.volumeBufferIndex = 0
 
         if beat:
             self.queue.put(True)
@@ -914,6 +925,13 @@ class AudioProcessor:
 
     def getInfo(self):
         return self.peakBuffer, self.peakBufferBeat, self.peakBufferIndex
+
+
+    def getVolume(self):
+
+        volume = np.sum(self.volumeBuffer)
+
+        return volume
 
 
     def isBeat(self):
@@ -1238,10 +1256,10 @@ if options['effectsActive'] and options['effectsMultithreaded']:
 frameNumber = 0
 additionalFrameTime = 0
 
-frameCountIn30Seconds = options['fps']*30
-frameCountIn10Seconds = options['fps']*10
-
 globalBpm = 0
+
+volumeBuffer = np.zeros(options['fps']*6)
+volumeBufferIndex = 0
 
 paused = False
 
@@ -1273,6 +1291,10 @@ while True:
             textY = int((options['screenHeight'] - textSize[1]) / 2)
             cv2.putText( img=frame, text=text, org=(textX, textY), fontFace=font, fontScale=fontSize, color=color, thickness=fontWidth, lineType=cv2.LINE_AA )
 
+        audio.isBeat()
+
+        beat = False
+
     else:
         frame = videostreams.getNextFrame()
         if type(frame) == type(None): # no frame retreived, use last frame
@@ -1296,9 +1318,18 @@ while True:
 
         beat = audio.isBeat()
 
-    if beat != False:
-        globalBpm = beat
-        beat = True
+        if beat != False:
+            globalBpm = beat
+            beat = True
+
+    volume = audio.getVolume()
+    volumeBuffer[volumeBufferIndex] = volume
+    volumeBufferIndex += 1
+    if volumeBufferIndex >= len(volumeBuffer):
+        volumeBufferIndex = 0
+
+    averageVolume = np.sum(volumeBuffer)/len(volumeBuffer)
+    print('{:6f}'.format(volume)+' / '+'{:6f}'.format(averageVolume))
 
     frame = debugDisplay(frame, beat)
 
