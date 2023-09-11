@@ -86,7 +86,7 @@ options = {
     'videostreamMaxQueueSize': 20,
 
 
-    'sensitivity': 0.3, # lower means slower, higher means faster; 0.1 - 2.0
+    'sensitivity': 0.5, # lower means slower, higher means faster; 0.1 - 2.0
 
     'windowName': 'The Dreamers',
 
@@ -105,7 +105,7 @@ options = {
         'colorMap': False,
         'blur': False,
         'edgeDetection': False,
-        'flip': True,
+        'flip': False,
         'sharpening': False,
         'emboss': False,
         'inverse': False,
@@ -126,8 +126,8 @@ options = {
 # probabilites:
 # the higher the number, the less likely the hit; 0 means hit every time
 probabilities = {
-    'changeVideoStream': 2,
-    'changeVideoStreamInput': 4,
+    'changeVideoStream': 10,
+    'changeVideoStreamInput': 15,
     #'repeatVideoStream': 25, # fires on changeVideoStream if there is at least a buffer worth of frames # TODO
     'changeColorMap': 20,
     'setBlur': 125,
@@ -138,10 +138,10 @@ probabilities = {
     'setEmboss': 125,
     'setInverse': 80,
     'unsetInverse': 12,
-    'setMultiple': 120,
-    'unsetMultiple': 60,
-    'setStaggered': 120,
-    'unsetStaggered': 20,
+    'setMultiple': 180,
+    'unsetMultiple': 80,
+    'setStaggered': 180,
+    'unsetStaggered': 10,
     'setText': 80,
 }
 
