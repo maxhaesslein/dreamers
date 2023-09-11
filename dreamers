@@ -681,8 +681,7 @@ class EffectProcessor():
             effectCheck = 'staggered'
 
         if not self.active[effectCheck]:
-            if options['verbose']:
-                print(' (effect '+str(effect)+' is not active)')
+            # this effect is not active
             return
 
         if options['verbose']:
