@@ -913,7 +913,7 @@ class AudioProcessor:
 
 
     def getInfo(self):
-        return self.peakBuffer, self.peakBufferBeat, self.peakBufferIndex, self.tempo.get_bpm()
+        return self.peakBuffer, self.peakBufferBeat, self.peakBufferIndex
 
 
     def isBeat(self):
@@ -1103,7 +1103,7 @@ def debugDisplay( im, beat ):
 
     if options['debugAudio']:
 
-        data, beatData, index, bpm = audio.getInfo()
+        data, beatData, index = audio.getInfo()
         index -= 1
         if index < 0:
             index = options['fps']-1
@@ -1133,7 +1133,7 @@ def debugDisplay( im, beat ):
         color = (255,255,255)
 
 
-        text = 'BPM: '+str(int(bpm))
+        text = 'BPM: '+str(int(globalBpm))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
