@@ -848,8 +848,11 @@ class AudioProcessor:
 
         self.bufferSize = 512
 
-        self.peakBuffer = np.zeros(options['fps']) # TODO: this will not work any more, because we run with a much higher framerate (~178 fps), so we need many more samples worth of buffer here; 1 second worth should be the target; this should be something like audioOptions['sampleRate']/self.bufferSize ?
-        self.peakBufferBeat = np.zeros(options['fps']) # TODO: see above; could be self.peakBuffer.copy() ?
+        peakBufferSize = int(audioOptions['sampleRate']/self.bufferSize)
+        print("PEAK BUFFER SIZE "+str(peakBufferSize))
+
+        self.peakBuffer = np.zeros(peakBufferSize)
+        self.peakBufferBeat = np.zeros(peakBufferSize)
         self.peakBufferIndex = 0
 
 
