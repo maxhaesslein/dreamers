@@ -842,6 +842,7 @@ class AudioProcessor:
 
     def __init__(self):
 
+        self.tempo = False
         self.running = True
         self.queue = Queue()
 
@@ -874,6 +875,9 @@ class AudioProcessor:
 
 
     def readAudioFrames( self, in_data, frame_count, time_info, status ):
+
+        if self.tempo == False:
+            return (in_data, pyaudio.paContinue)
 
         signal = np.frombuffer(in_data, dtype=np.float32)
 
@@ -1108,7 +1112,7 @@ def debugDisplay( im, beat ):
         color = (255,255,255)
 
 
-        text = 'BPM: '+str(int(bpm))+'/'+str(int(bpm*2))
+        text = 'BPM: '+str(int(bpm))
         textsize = cv2.getTextSize(text, options['debugFont'], 1, 1)[0]
         cv2.putText( im, text, (options['screenWidth']-textsize[0]-10, textX), options['debugFont'], 1, color, 1, cv2.LINE_AA )
 
