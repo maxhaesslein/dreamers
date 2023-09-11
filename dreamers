@@ -935,11 +935,11 @@ def probabilityCheck( key ):
 
     sensitivity = options['sensitivity']
 
-    if globalBpm < 80 and sensitivity > 0.2:
+    if globalBpm < 90 and sensitivity > 0.2:
         sensitivity = sensitivity - 0.2
-    elif globalBpm > 130:
+    elif globalBpm > 126 and sensitivity > 0.1:
         sensitivity = sensitivity + 0.2
-    elif globalBpm > 150:
+    elif globalBpm > 140 and sensitivity > 0.1:
         sensitivity = sensitivity + 0.4
 
     if random.randint(0, probabilities[key])+1 <= options['sensitivity']*10:
