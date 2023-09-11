@@ -629,7 +629,9 @@ class EffectProcessor():
 
             frame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
             frame = np.concatenate( [frame]*self.options['multiple'], axis=1)
-            frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
+
+            if hasattr(frame, "__len__"): # make sure this is an array, if not the concatenate will fail
+                frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
 
             frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
