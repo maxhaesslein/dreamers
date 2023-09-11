@@ -1261,7 +1261,7 @@ additionalFrameTime = 0
 
 globalBpm = 0
 
-volumeBuffer = np.zeros(options['fps']*6)
+volumeBuffer = np.zeros(options['fps']*10)
 volumeBufferIndex = 0
 
 globalVolume = 0
