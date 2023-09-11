@@ -140,8 +140,8 @@ probabilities = {
     'unsetInverse': 12,
     'setMultiple': 180,
     'unsetMultiple': 80,
-    'setStaggered': 180,
-    'unsetStaggered': 10,
+    'setStaggered': 170,
+    'unsetStaggered': 40,
     'setText': 80,
 }
 
@@ -918,7 +918,8 @@ class AudioProcessor:
     def isBeat(self):
 
         if self.queue.qsize() > 0:
-            return self.queue.get()
+            self.queue.get()
+            return self.tempo.get_bpm()
 
         return False
 
@@ -930,6 +931,16 @@ class AudioProcessor:
 
 
 def probabilityCheck( key ):
+
+    sensitivity = options['sensitivity']
+
+    if globalBpm < 80 and sensitivity > 0.2:
+        sensitivity = sensitivity - 0.2
+    elif globalBpm > 130:
+        sensitivity = sensitivity + 0.2
+    elif globalBpm > 150:
+        sensitivity = sensitivity + 0.4
+
     if random.randint(0, probabilities[key])+1 <= options['sensitivity']*10:
         return True
     else:
@@ -1229,6 +1240,8 @@ additionalFrameTime = 0
 frameCountIn30Seconds = options['fps']*30
 frameCountIn10Seconds = options['fps']*10
 
+globalBpm = 0
+
 paused = False
 
 messages = []
@@ -1281,6 +1294,10 @@ while True:
             frame = resizeFrame(frame)
 
         beat = audio.isBeat()
+
+    if beat != False:
+        globalBpm = beat
+        beat = True
 
     frame = debugDisplay(frame, beat)
 
