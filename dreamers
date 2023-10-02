@@ -166,9 +166,14 @@ maxVals = {
 
 
 # check for config file and read options
-if os.path.isfile('/home/mh/dreamers/dreamers.ini'): # TODO: don't hardcode the path here!
+dreamers_ini_path = os.path.join(os.path.dirname(__file__), 'dreamers.ini')
+if os.path.isfile(dreamers_ini_path):
+
+    if options['verbose']:
+        print('loading '+str(dreamers_ini_path))
+
     configParser = ConfigParser()
-    configParser.read('/home/mh/dreamers/dreamers.ini') # TODO: don't hardcode the path here!
+    configParser.read(dreamers_ini_path)
 
     intOptions = [ 'fps', 'screenWidth', 'screenHeight', 'videostreamCount', 'videostreamMaxQueueSize', 'audioDisplayScaling', 'initSleepTime', 'fontSize' ]
     floatOptions = [ 'fpsSmoothing', 'sensitivity' ]
