@@ -2,19 +2,19 @@
 
 Live audioreactive visuals on a Raspberry Pi 4, written in Python3 and OpenCV. Currently a work in progress.
 
-See [here](https://www.maxhaesslein.de/visual/objects/the-dreamers/) for a video of the previous version 3. This will be updated soon.
+See [here](https://www.maxhaesslein.de/visual/objects/the-dreamers/) for a video and additional information.
 
-This is a personal project and may be a bit finicky to set up. Your best bet is a Raspberry Pi 4 with Raspberry Pi OS Lite 32-bit. You need to install some dependencies with:
+This is a personal project and may be a bit finicky to set up.
 
 ## Installation
 
-Install required dependencies with:
+Use a fresh Raspberry Pi OS Lite 32-bit installation on a Raspberry Pi 4 or later (otherwise, you need to set the resolution to 640×480 or lower). Install required dependencies with:
 
 ```bash
 sudo apt install python3-opencv python3-pyaudio python3-aubio xserver-xorg xinit
 ```
 
-Then download or clone this repo, extract it into `~/dreamers` and add videofiles in a `footage/` subfolder. Then start everything by calling the `start` file.
+Then download or clone this repo, extract it into `~/dreamers` (this path is hardcoded at some places, if you want to use another path, change the code accordingly) and add videofiles in a `footage/` subfolder. Then start everything by calling the `start` file.
 
 The videofiles should be h.264 encoded. The sweetspot is 1280x720px at 24/25/30 fps on a Raspberry Pi 4, without heavy effects. Don't mix resolutions or framerates.
 
