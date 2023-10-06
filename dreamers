@@ -601,7 +601,7 @@ class EffectProcessor():
             self.options['emboss'] -= 1
 
         # show frame multiple times (either staggered, or the same frame)
-        if self.active['staggered'] and self.options['staggered'] > 0:
+        if self.active['staggered'] and self.options['staggered'] > 1:
             # show staggered frames
 
             resizeFactor = 1/self.options['staggered']
@@ -624,20 +624,16 @@ class EffectProcessor():
                 frame = np.concatenate(frameLines, axis=1)
                 frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
-        elif self.active['multiple'] and self.options['multiple']:
+        elif self.active['multiple'] and self.options['multiple'] > 1:
             # show same frame multiple times
 
             resizeFactor = 1/self.options['multiple']
-
             if self.options['multiple'] == 3 or self.options['multiple'] == 5:
                 resizeFactor *= 1.02
 
             frame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
             frame = np.concatenate( [frame]*self.options['multiple'], axis=1)
-
-            if hasattr(frame, "__len__"): # make sure this is an array, if not the concatenate will fail
-                frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
-
+            frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
             frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         # tint image
@@ -825,13 +821,13 @@ class EffectProcessor():
         # set multiple
         if self.options['multiple'] and probabilityCheck('unsetMultiple'):
             self.activate('unMultiple')
-        elif probabilityCheck('setMultiple'):
+        elif not self.options['staggered'] and not self.options['multiple'] and probabilityCheck('setMultiple'):
             self.activate('multiple')
 
         # set staggered
         if self.options['staggered'] and probabilityCheck('unsetStaggered'):
             self.activate('unStaggered')
-        elif probabilityCheck('setStaggered'):
+        elif not self.options['multiple'] and not self.options['staggered'] and probabilityCheck('setStaggered'):
             self.activate('staggered')
 
         # set text
