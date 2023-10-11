@@ -604,22 +604,24 @@ class EffectProcessor():
         if self.active['staggered'] and self.options['staggered'] > 1:
             # show staggered frames
 
-            resizeFactor = 1/self.options['staggered']
+            staggered = self.options['staggered']
 
-            if self.options['staggered'] == 3 or self.options['staggered'] == 5:
+            resizeFactor = 1/staggered
+
+            if staggered == 3 or staggered == 5:
                 resizeFactor *= 1.02
 
             smallFrame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
-            if len(self.staggeredFrames) >= self.options['staggered']*self.options['staggered']:
+            if len(self.staggeredFrames) >= staggered*staggered:
                 # remove elements from beginning
-                n = self.options['staggered']*self.options['staggered']+1-len(self.staggeredFrames)
+                n = staggered*staggered+1-len(self.staggeredFrames)
                 del self.staggeredFrames[:n]
             self.staggeredFrames.append(smallFrame)
 
-            if len(self.staggeredFrames) >= self.options['staggered']*self.options['staggered']:
+            if len(self.staggeredFrames) >= staggered*staggered:
                 # if we have enough frames, show grid:
                 reverseStaggeredFrames = self.staggeredFrames[::-1]
-                frameLines = np.array_split(reverseStaggeredFrames, self.options['staggered'])
+                frameLines = np.array_split(reverseStaggeredFrames, staggered)
                 frameLines = np.concatenate(frameLines, axis=1)
                 frame = np.concatenate(frameLines, axis=1)
                 frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
@@ -627,13 +629,15 @@ class EffectProcessor():
         elif self.active['multiple'] and self.options['multiple'] > 1:
             # show same frame multiple times
 
-            resizeFactor = 1/self.options['multiple']
-            if self.options['multiple'] == 3 or self.options['multiple'] == 5:
+            multiple = self.options['multiple']
+
+            resizeFactor = 1/multiple
+            if multiple == 3 or multiple == 5:
                 resizeFactor *= 1.02
 
             frame = cv2.resize(frame, (0,0), fx=resizeFactor, fy=resizeFactor)
-            frame = np.concatenate( [frame]*self.options['multiple'], axis=1)
-            frame = np.concatenate( [frame]*self.options['multiple'], axis=0)
+            frame = np.concatenate( [frame]*multiple, axis=1)
+            frame = np.concatenate( [frame]*multiple, axis=0)
             frame = frame[0:options['screenHeight'], 0:options['screenWidth']]
 
         # tint image
